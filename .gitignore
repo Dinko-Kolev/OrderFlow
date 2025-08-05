@@ -34,6 +34,8 @@ Thumbs.db
 .env.development.local
 .env.test.local
 .env.production.local
+frontend/.env
+backend/.env
 
 # Docker
 *.pid
@@ -44,5 +46,3 @@ Thumbs.db
 coverage/
 *.tgz
 .cache/
-frontend/.env
-backend/.env
