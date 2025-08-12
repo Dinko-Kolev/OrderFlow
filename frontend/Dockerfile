@@ -1,21 +1,15 @@
-FROM node:18-alpine
-
+FROM node:18-alpine AS deps
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
+RUN npm ci || npm install
 
-# Install dependencies
-RUN npm install
-RUN npm install -g next
-
-# Copy source code
+FROM node:18-alpine AS runner
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build Tailwind CSS
-RUN npx tailwindcss build -o styles/tailwind.css
+# Optional: build step (keeping dev by default)
+# RUN npm run build
 
 EXPOSE 3000
-
-# Start development server
 CMD ["npm", "run", "dev"]

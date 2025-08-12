@@ -1,6 +1,6 @@
 # OrderFlow - Pizza Ordering System
 
-A full-stack pizza ordering system built with Next.js frontend, NestJS backend, and PostgreSQL database, orchestrated with Docker Compose.
+A full-stack pizza ordering system built with Next.js frontend, Express.js backend, and PostgreSQL database, orchestrated with Docker Compose.
 
 ## 🏗️ Architecture
 
@@ -12,8 +12,8 @@ project-root/
 ```
 
 ### Tech Stack
-- **Frontend**: Next.js 13, React 18
-- **Backend**: NestJS 10, TypeScript
+- **Frontend**: Next.js, React 18
+- **Backend**: Express.js (modular services/controllers architecture)
 - **Database**: PostgreSQL 15
 - **Containerization**: Docker & Docker Compose
 - **Development**: Hot reload enabled for both frontend and backend
@@ -75,13 +75,15 @@ frontend/
 ### Backend (`/backend`)
 ```
 backend/
-├── src/            # Source code
-│   ├── main.ts     # Application entry point
-│   ├── app.module.ts # Root module
-│   └── app.controller.ts # Basic API endpoints
-├── package.json    # Dependencies and scripts
-├── tsconfig.json   # TypeScript configuration
-└── Dockerfile      # Backend container setup
+├── server.js            # Express app bootstrap
+├── app.module.js        # Service/controller wiring
+├── entities/            # Entities (Order, OrderItem, Product, BaseEntity)
+├── modules/             # Services and Controllers
+│   ├── OrderService.js / OrderController.js
+│   └── ProductService.js / ProductController.js
+├── utils/errors.js      # Error helpers and middleware
+├── package.json         # Dependencies and scripts
+└── Dockerfile           # Backend container setup
 ```
 
 ## 🔧 Configuration
@@ -105,16 +107,19 @@ DB_NAME=pizza_db
 
 ### Ports
 - **3000**: Frontend (Next.js)
-- **3001**: Backend (NestJS)
+- **3001**: Backend (Express.js)
 - **5432**: Database (PostgreSQL)
 
 ## 🌟 Features
 
 ### Current Features
-- **Pizza Ordering Form**: Simple form with pizza types, quantities, and special instructions
-- **Backend API**: Basic NestJS endpoints with health check
-- **Real-time Status**: Frontend checks backend connectivity
-- **Docker Setup**: Complete containerized environment
+- Modern homepage with video hero, responsive UI
+- Authentication (login/register) and profile management
+- Cart and Checkout flow (delivery/pickup, payment selection)
+- Order creation, order number generation, order detail page
+- Address book (add/edit/delete, default address) and checkout auto-fill
+- Modular backend architecture with entities/services/controllers
+- Docker Compose for local development
 
 ### Planned Features (from repository rules)
 1. **Order Placement** - Web-based ordering with validation
@@ -152,6 +157,11 @@ docker-compose -f docker-compose.prod.yml up -d
 ### Backend API (http://localhost:3001)
 - `GET /` - Welcome message
 - `GET /health` - Health check endpoint
+- `POST /api/orders` - Create order
+- `GET /api/orders/:orderNumber` - Get order by number
+- `GET /api/users/:userId/orders` - List orders for user
+- `PUT /api/auth/profile` - Update profile (auth required)
+- `GET/POST/PUT/DELETE /api/users/:userId/addresses` - Manage addresses (auth required)
 
 ## 🆘 Troubleshooting
 

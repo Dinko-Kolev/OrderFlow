@@ -52,3 +52,10 @@ backend/.env
 # Misc
 *.tgz
 .cache/
+
+# Public/videos folder
+public/videos/
+
+# Ignore large homepage videos (kept folder with .gitkeep)
+frontend/public/videos/
+!frontend/public/videos/.gitkeep

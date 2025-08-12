@@ -11,13 +11,23 @@ class ApiClient {
   // Generic request method with professional error handling
   async request(endpoint, options = {}) {
     const url = buildApiUrl(endpoint)
+    console.log('API Request:', { endpoint, url, options })
+
+    // Strip/normalize non-fetch options
+    const { cache: internalCacheFlag, ...restOptions } = options || {}
+    const fetchOptions = { ...restOptions }
+    if (internalCacheFlag === false) {
+      // Prevent browser error by mapping boolean to valid RequestCache value
+      fetchOptions.cache = 'no-cache'
+    }
+
     const defaultOptions = {
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers
+        ...fetchOptions.headers
       },
       credentials: 'include',
-      ...options
+      ...fetchOptions
     }
 
     let lastError
@@ -152,8 +162,16 @@ export const api = {
   auth: {
     login: (credentials) => apiClient.post(API_ENDPOINTS.LOGIN, credentials),
     register: (userData) => apiClient.post(API_ENDPOINTS.REGISTER, userData),
+    // Disable cache to always fetch fresh user data
     getProfile: () => apiClient.get(API_ENDPOINTS.PROFILE, {
-      headers: apiClient.getAuthHeaders()
+      headers: apiClient.getAuthHeaders(),
+      cache: false
+    }),
+    updateProfile: (profileData) => apiClient.put(API_ENDPOINTS.PROFILE, profileData, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...apiClient.getAuthHeaders()
+      }
     }),
     logout: () => apiClient.post(API_ENDPOINTS.LOGOUT, {}, {
       headers: apiClient.getAuthHeaders()
@@ -170,7 +188,10 @@ export const api = {
   // Orders endpoints (future)
   orders: {
     create: (orderData) => apiClient.post(API_ENDPOINTS.ORDERS, orderData, {
-      headers: apiClient.getAuthHeaders()
+      headers: {
+        'Content-Type': 'application/json',
+        ...apiClient.getAuthHeaders()
+      }
     }),
     getHistory: () => apiClient.get(API_ENDPOINTS.ORDER_HISTORY, {
       headers: apiClient.getAuthHeaders()
@@ -222,17 +243,50 @@ export const api = {
     getAll: () => apiClient.get('/api/toppings')
   },
 
+  // Addresses endpoints
+  addresses: {
+    getForUser: (userId) => apiClient.get(`/api/users/${userId}/addresses`, {
+      headers: apiClient.getAuthHeaders(),
+      cache: false
+    }),
+    create: (userId, address) => apiClient.post(`/api/users/${userId}/addresses`, address, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...apiClient.getAuthHeaders()
+      }
+    }),
+    update: (userId, addressId, address) => apiClient.put(`/api/users/${userId}/addresses/${addressId}`, address, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...apiClient.getAuthHeaders()
+      }
+    }),
+    delete: (userId, addressId) => apiClient.delete(`/api/users/${userId}/addresses/${addressId}`, {
+      headers: apiClient.getAuthHeaders()
+    })
+  },
+
   // Order endpoints
   orders: {
-    create: (orderData) => apiClient.post('/api/orders', orderData, {
+    create: (orderData) => apiClient.post(API_ENDPOINTS.ORDERS, orderData, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...apiClient.getAuthHeaders()
+      },
       timeout: 30000 // 30 seconds for order creation
     }),
     getByNumber: (orderNumber) => apiClient.get(`/api/orders/${orderNumber}`),
     getUserOrders: (userId, email) => {
-      const params = new URLSearchParams()
-      if (userId) params.append('userId', userId)
-      if (email) params.append('email', email)
-      return apiClient.get(`/api/orders?${params.toString()}`)
+      if (userId) {
+        return apiClient.get(`/api/users/${userId}/orders`)
+      }
+      // Fallback for email-based lookup if needed
+      if (email) {
+        const params = new URLSearchParams()
+        params.append('email', email)
+        return apiClient.get(`/api/orders?${params.toString()}`)
+      }
+      return Promise.reject(new Error('Either userId or email is required'))
     },
     updateStatus: (orderNumber, status, notes) => apiClient.put(`/api/orders/${orderNumber}/status`, {
       status,

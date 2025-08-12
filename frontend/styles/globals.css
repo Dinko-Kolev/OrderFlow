@@ -56,4 +56,16 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@layer utilities {
+  /* Mobile navigation safe area - ensures content is not blocked by fixed bottom nav */
+  .mobile-nav-safe {
+    @apply pb-40 sm:pb-0;
+  }
+  
+  /* Alternative: Use this for pages that need more space */
+  .mobile-nav-safe-lg {
+    @apply pb-48 sm:pb-0;
+  }
 } 

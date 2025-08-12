@@ -17,14 +17,53 @@ export default function CheckoutPage() {
   
   // Form data
   const [formData, setFormData] = useState({
-    customerName: user?.name || '',
-    customerEmail: user?.email || '',
+    customerName: '',
+    customerEmail: '',
     customerPhone: '',
     deliveryType: 'delivery',
     deliveryAddress: '',
     paymentMethod: 'card',
     specialInstructions: ''
   })
+
+  // Default address state (from user's saved addresses)
+  const [autoFilledAddress, setAutoFilledAddress] = useState(false)
+
+  // Populate form with user data when user is available
+  useEffect(() => {
+    if (user) {
+      console.log('User data available:', user)
+      setFormData(prev => ({
+        ...prev,
+        customerName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        customerEmail: user.email || '',
+        customerPhone: user.phone || ''
+      }))
+    }
+  }, [user])
+
+  // Prefill default address when delivery is selected
+  useEffect(() => {
+    const fetchDefaultAddress = async () => {
+      if (!user?.id || formData.deliveryType !== 'delivery') return
+      try {
+        const res = await api.addresses.getForUser(user.id)
+        const list = res?.data?.addresses || res?.addresses || res?.data || []
+        if (Array.isArray(list) && list.length > 0) {
+          const def = list.find(a => a.is_default) || list[0]
+          if (def && !formData.deliveryAddress) {
+            const formatted = `${def.street}, ${def.zip_code} ${def.city}, ${def.state}`
+            setFormData(prev => ({ ...prev, deliveryAddress: formatted }))
+            setAutoFilledAddress(true)
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load default address', e)
+      }
+    }
+    fetchDefaultAddress()
+    // run when user id or deliveryType changes
+  }, [user?.id, formData.deliveryType])
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -96,6 +135,22 @@ export default function CheckoutPage() {
     setLoading(true)
 
     try {
+      // Debug: Log cart items structure before mapping
+      console.log('=== CART ITEMS DEBUG ===')
+      console.log('Raw cart items:', items)
+      console.log('First item structure:', items[0] ? Object.keys(items[0]) : 'No items')
+      if (items[0]) {
+        console.log('First item details:', {
+          product_id: items[0].product_id,
+          base_price: items[0].base_price,
+          unit_price: items[0].unit_price,
+          total_price: items[0].total_price,
+          price: items[0].price,
+          quantity: items[0].quantity
+        })
+      }
+      console.log('=== END DEBUG ===')
+
       // Prepare order data
       const orderData = {
         userId: user?.id || null,
@@ -110,19 +165,36 @@ export default function CheckoutPage() {
         items: items.map(item => ({
           productId: item.product_id,
           quantity: item.quantity,
+          unitPrice: item.base_price || item.price || item.unit_price || 0,
+          totalPrice: item.total_price || (item.price || item.unit_price || 0) * item.quantity || 0,
           customizations: item.customizations || [],
           specialInstructions: item.special_instructions || ''
         }))
       }
 
+      // Debug: Log the order data being sent
+      console.log('Order data being sent:', orderData)
+      console.log('Cart items:', items)
+      console.log('User data:', user)
+
       const response = await api.orders.create(orderData)
+      
+      // Debug: Log the response to see its structure
+      console.log('API Response:', response)
 
       if (response.success) {
         // Clear cart
         await clearCart()
         
         // Redirect to order confirmation
-        router.push(`/order/${response.order.orderNumber}`)
+        // Check if response.order exists and has orderNumber, otherwise use response.orderNumber directly
+        const orderNumber = response.order?.orderNumber || response.orderNumber
+        if (orderNumber) {
+          router.push(`/order/${orderNumber}`)
+        } else {
+          console.error('No order number received from API')
+          setErrors({ submit: 'Error: No se recibió número de pedido del servidor.' })
+        }
       }
 
     } catch (error) {
@@ -136,6 +208,8 @@ export default function CheckoutPage() {
   if (totalItems === 0) {
     return null // Will redirect
   }
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 pt-20">
@@ -161,13 +235,17 @@ export default function CheckoutPage() {
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="space-y-6">
               
+
+              
               {/* Customer Information */}
               <div className="bg-white rounded-2xl shadow-lg p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900">Información Personal</h2>
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-gray-900">Información Personal</h2>
+                  </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
@@ -182,7 +260,7 @@ export default function CheckoutPage() {
                       onChange={handleInputChange}
                       className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
                         errors.customerName ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      } ${user ? 'bg-green-50' : ''}`}
                       placeholder="Tu nombre completo"
                     />
                     {errors.customerName && (
@@ -201,7 +279,7 @@ export default function CheckoutPage() {
                       onChange={handleInputChange}
                       className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
                         errors.customerPhone ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      } ${user ? 'bg-green-50' : ''}`}
                       placeholder="600 123 456"
                     />
                     {errors.customerPhone && (
@@ -221,7 +299,7 @@ export default function CheckoutPage() {
                     onChange={handleInputChange}
                     className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
                       errors.customerEmail ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    } ${user ? 'bg-green-50' : ''}`}
                     placeholder="tu@email.com"
                   />
                   {errors.customerEmail && (
@@ -293,7 +371,7 @@ export default function CheckoutPage() {
                       rows={3}
                       className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-colors resize-none ${
                         errors.deliveryAddress ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      } ${autoFilledAddress ? 'bg-green-50' : ''}`}
                       placeholder="Calle, número, piso, puerta, código postal, ciudad..."
                     />
                     {errors.deliveryAddress && (
@@ -413,13 +491,21 @@ export default function CheckoutPage() {
               <div className="space-y-4 mb-6">
                 {items.map((item) => (
                   <div key={item.id} className="flex gap-3">
-                    <img
-                      src={item.image_url}
-                      alt={item.product_name}
-                      className="w-16 h-16 object-cover rounded-lg"
-                    />
+                    <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                      {item.product_image ? (
+                        <img
+                          src={item.product_image}
+                          alt={item.product_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ShoppingBag className="w-6 h-6 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 text-sm">{item.product_name}</h3>
+                      <h3 className="text-sm font-semibold text-gray-900">{item.product_name}</h3>
                       <p className="text-xs text-gray-600">Cantidad: {item.quantity}</p>
                       {item.customizations && item.customizations.length > 0 && (
                         <p className="text-xs text-gray-500">Con personalizaciones</p>

@@ -33,7 +33,7 @@ export default function App({ Component, pageProps }) {
       <AuthProvider>
         <CartProvider>
           <MainNav />
-          <main id="main-content">
+          <main id="main-content" className="mobile-nav-safe">
             <Component {...pageProps} />
           </main>
         </CartProvider>
