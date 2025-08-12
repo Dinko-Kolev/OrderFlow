@@ -25,6 +25,8 @@ export function AuthProvider({ children }) {
       try {
         setToken(savedToken)
         setUser(JSON.parse(savedUser))
+        // Ensure API client sends Authorization header on page reloads
+        api.setAuthToken(savedToken)
       } catch (error) {
         console.error('Error parsing saved user data:', error)
         localStorage.removeItem('auth_token')
@@ -86,6 +88,40 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Fetch fresh profile from backend and update context/localStorage
+  const refreshProfile = async () => {
+    try {
+      const res = await api.auth.getProfile()
+      const fresh = res?.data || res
+      const normalized = fresh?.id !== undefined ? {
+        id: fresh.id,
+        firstName: fresh.firstName,
+        lastName: fresh.lastName,
+        email: fresh.email,
+        phone: fresh.phone
+      } : (fresh?.user || null)
+      if (normalized) {
+        setUser(normalized)
+        localStorage.setItem('user_data', JSON.stringify(normalized))
+        return normalized
+      }
+    } catch (e) {
+      console.error('Failed to refresh profile', e)
+    }
+    return user
+  }
+
+  // Immediately update user in context + localStorage (client-side optimistic)
+  const updateUser = (partial) => {
+    setUser(prev => {
+      const updated = { ...(prev || {}), ...(partial || {}) }
+      try {
+        localStorage.setItem('user_data', JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+  }
+
   const logout = () => {
     setUser(null)
     setToken(null)
@@ -104,6 +140,8 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    refreshProfile,
+    updateUser,
     getAuthHeaders,
     isAuthenticated: !!user,
   }

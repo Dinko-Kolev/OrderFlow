@@ -202,7 +202,7 @@ const CartSidebar = ({ isOpen, onClose }) => {
 
             {/* Footer */}
             {!loading && items.length > 0 && (
-              <div className="border-t border-gray-200 p-6 bg-white">
+              <div className="border-t border-gray-200 p-6 pb-40 md:pb-6 bg-white">
                 <div className="space-y-4">
                   {/* Total */}
                   <div className="flex justify-between items-center text-lg font-bold">

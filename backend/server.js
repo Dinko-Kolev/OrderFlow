@@ -3,6 +3,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { errorHandler } = require('./utils/errors');
 
 const app = express();
 const port = 3001;
@@ -234,6 +235,49 @@ app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// Update profile endpoint
+app.put('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    console.log('PUT /api/auth/profile headers:', req.headers)
+    console.log('PUT /api/auth/profile body:', req.body)
+    const { firstName, lastName, phone } = req.body
+    if (!firstName || !lastName) {
+      return res.status(400).json({ error: 'Nombre y apellido son requeridos' })
+    }
+
+    const client = await pool.connect()
+    try {
+      const result = await client.query(
+        'UPDATE users SET first_name = $1, last_name = $2, phone = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING id, first_name, last_name, email, phone',
+        [firstName, lastName, phone || null, req.user.userId]
+      )
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' })
+      }
+
+      const u = result.rows[0]
+      res.json({
+        success: true,
+        data: {
+          user: {
+            id: u.id,
+            firstName: u.first_name,
+            lastName: u.last_name,
+            email: u.email,
+            phone: u.phone
+          }
+        }
+      })
+    } finally {
+      client.release()
+    }
+  } catch (error) {
+    console.error('Update profile error:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
 // Products Routes (existing)
 app.get('/api/products', async (req, res) => {
   try {
@@ -347,6 +391,109 @@ app.post('/api/reservations', async (req, res) => {
 
   } catch (error) {
     console.error('Error creating reservation:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// =============================================
+// ADDRESSES ENDPOINTS (protected)
+// =============================================
+
+// Get addresses for user
+app.get('/api/users/:userId/addresses', authenticateToken, async (req, res) => {
+  try {
+    console.log('GET /api/users/:userId/addresses', { params: req.params, authUserId: req.user?.userId })
+    const { userId } = req.params
+    if (parseInt(userId) !== req.user.userId) {
+      return res.status(403).json({ error: 'Acceso denegado' })
+    }
+    const result = await pool.query('SELECT * FROM addresses WHERE user_id = $1 ORDER BY is_default DESC, id DESC', [userId])
+    res.json({ success: true, addresses: result.rows })
+  } catch (error) {
+    console.error('Error fetching addresses:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// Create address
+app.post('/api/users/:userId/addresses', authenticateToken, async (req, res) => {
+  try {
+    console.log('POST /api/users/:userId/addresses', { params: req.params, body: req.body, authUserId: req.user?.userId })
+    const { userId } = req.params
+    const { street, city, state, zip_code, is_default } = req.body
+    if (parseInt(userId) !== req.user.userId) {
+      return res.status(403).json({ error: 'Acceso denegado' })
+    }
+    if (!street || !city || !state || !zip_code) {
+      return res.status(400).json({ error: 'Todos los campos de dirección son requeridos' })
+    }
+    const client = await pool.connect()
+    try {
+      if (is_default) {
+        await client.query('UPDATE addresses SET is_default = false WHERE user_id = $1', [userId])
+      }
+      const result = await client.query(
+        'INSERT INTO addresses (user_id, street, city, state, zip_code, is_default) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [userId, street, city, state, zip_code, !!is_default]
+      )
+      res.status(201).json({ success: true, address: result.rows[0] })
+    } finally {
+      client.release()
+    }
+  } catch (error) {
+    console.error('Error creating address:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// Update address
+app.put('/api/users/:userId/addresses/:addressId', authenticateToken, async (req, res) => {
+  try {
+    console.log('PUT /api/users/:userId/addresses/:addressId', { params: req.params, body: req.body, authUserId: req.user?.userId })
+    const { userId, addressId } = req.params
+    const { street, city, state, zip_code, is_default } = req.body
+    if (parseInt(userId) !== req.user.userId) {
+      return res.status(403).json({ error: 'Acceso denegado' })
+    }
+    const client = await pool.connect()
+    try {
+      // Ensure address belongs to user
+      const owns = await client.query('SELECT id FROM addresses WHERE id = $1 AND user_id = $2', [addressId, userId])
+      if (owns.rows.length === 0) {
+        return res.status(404).json({ error: 'Dirección no encontrada' })
+      }
+      if (is_default) {
+        await client.query('UPDATE addresses SET is_default = false WHERE user_id = $1', [userId])
+      }
+      const result = await client.query(
+        'UPDATE addresses SET street = $1, city = $2, state = $3, zip_code = $4, is_default = $5 WHERE id = $6 RETURNING *',
+        [street, city, state, zip_code, !!is_default, addressId]
+      )
+      res.json({ success: true, address: result.rows[0] })
+    } finally {
+      client.release()
+    }
+  } catch (error) {
+    console.error('Error updating address:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// Delete address
+app.delete('/api/users/:userId/addresses/:addressId', authenticateToken, async (req, res) => {
+  try {
+    console.log('DELETE /api/users/:userId/addresses/:addressId', { params: req.params, authUserId: req.user?.userId })
+    const { userId, addressId } = req.params
+    if (parseInt(userId) !== req.user.userId) {
+      return res.status(403).json({ error: 'Acceso denegado' })
+    }
+    const result = await pool.query('DELETE FROM addresses WHERE id = $1 AND user_id = $2 RETURNING id', [addressId, userId])
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Dirección no encontrada' })
+    }
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting address:', error)
     res.status(500).json({ error: 'Error interno del servidor' })
   }
 })
@@ -765,329 +912,53 @@ app.delete('/api/cart', async (req, res) => {
   }
 })
 
+// Add error handling middleware
+app.use(errorHandler)
+
 // Start server
 app.listen(port, '0.0.0.0', () => {
-  console.log(`🚀 Backend server running on http://localhost:${port}`);
+  console.log(`🚀 OrderFlow Backend Server running on http://localhost:${port}`);
   console.log(`📊 Database host: ${process.env.DB_HOST || 'db'}`);
   console.log(`🔐 Authentication endpoints available`);
   console.log(`🍽️ Reservations system enabled`);
+  console.log(`🍕 Orders API: http://localhost:${port}/api/orders`);
+  console.log(`🛍️ Products API: http://localhost:${port}/api/products`);
+  console.log(`💚 Health check: http://localhost:${port}/api/health`);
 });
 
 // =============================================
 // ORDER ENDPOINTS
 // =============================================
 
-// Create new order
-app.post('/api/orders', async (req, res) => {
-  const {
-    userId,
-    guestEmail,
-    customerName,
-    customerPhone,
-    customerEmail,
-    deliveryType,
-    deliveryAddress,
-    paymentMethod,
-    specialInstructions,
-    items // Array of cart items with customizations
-  } = req.body
+// Import the new architecture
+const AppModule = require('./app.module')
 
-  const client = await pool.connect()
-  
-  try {
-    await client.query('BEGIN')
+// Initialize application module
+const appModule = new AppModule(pool)
 
-    // Calculate totals
-    let totalAmount = 0
-    const deliveryFee = deliveryType === 'delivery' ? 2.50 : 0
+// Order routes using the new controller
+app.post('/api/orders', appModule.getController('orderController').createOrder)
+app.get('/api/orders/:orderNumber', appModule.getController('orderController').getOrderByNumber)
+app.put('/api/orders/:orderId/status', appModule.getController('orderController').updateOrderStatus)
+app.get('/api/users/:userId/orders', appModule.getController('orderController').getUserOrders)
 
-    // Validate and calculate item prices
-    for (const item of items) {
-      const productResult = await client.query(
-        'SELECT base_price FROM products WHERE id = $1',
-        [item.productId]
-      )
-      
-      if (productResult.rows.length === 0) {
-        throw new Error(`Product with ID ${item.productId} not found`)
-      }
+// Product routes using the new controller
+app.get('/api/products', appModule.getController('productController').getProducts)
+app.get('/api/products/:productId', appModule.getController('productController').getProductById)
+app.get('/api/categories/:categoryId/products', appModule.getController('productController').getProductsByCategory)
+app.get('/api/products/featured', appModule.getController('productController').getFeaturedProducts)
+app.get('/api/products/search', appModule.getController('productController').searchProducts)
+app.get('/api/categories', appModule.getController('productController').getCategories)
+app.get('/api/products/:productId/image', appModule.getController('productController').getProductImage)
 
-      let itemPrice = parseFloat(productResult.rows[0].base_price)
-      
-      // Add customization prices
-      if (item.customizations && item.customizations.length > 0) {
-        for (const custom of item.customizations) {
-          const toppingResult = await client.query(
-            'SELECT price FROM pizza_toppings WHERE id = $1',
-            [custom.toppingId]
-          )
-          if (toppingResult.rows.length > 0) {
-            itemPrice += parseFloat(toppingResult.rows[0].price) * custom.quantity
-          }
-        }
-      }
-
-      totalAmount += itemPrice * item.quantity
-    }
-
-    totalAmount += deliveryFee
-
-    // Generate order number
-    const orderNumberResult = await client.query('SELECT generate_order_number() as order_number')
-    const orderNumber = orderNumberResult.rows[0].order_number
-
-    // Calculate estimated delivery time (30-45 minutes from now)
-    const estimatedDelivery = new Date()
-    estimatedDelivery.setMinutes(estimatedDelivery.getMinutes() + (deliveryType === 'delivery' ? 45 : 30))
-
-    // Create order - using actual database schema
-    const orderResult = await client.query(
-      `INSERT INTO orders (
-        user_id, order_number, status, order_type, customer_name, customer_phone, 
-        customer_email, delivery_address_text, delivery_instructions, 
-        subtotal, delivery_fee, total_amount, estimated_delivery_time, special_instructions
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      RETURNING id, order_number`,
-      [
-        userId || null, orderNumber, 'pending', deliveryType, customerName, customerPhone,
-        customerEmail, deliveryAddress, null, // delivery_instructions
-        totalAmount - deliveryFee, deliveryFee, totalAmount, estimatedDelivery, specialInstructions
-      ]
-    )
-
-    const orderId = orderResult.rows[0].id
-
-    // Create order items
-    for (const item of items) {
-      const productResult = await client.query(
-        'SELECT name, base_price FROM products WHERE id = $1',
-        [item.productId]
-      )
-
-      if (productResult.rows.length === 0) continue
-
-      const product = productResult.rows[0]
-      let unitPrice = parseFloat(product.base_price)
-
-      // Calculate unit price with customizations
-      if (item.customizations && item.customizations.length > 0) {
-        for (const custom of item.customizations) {
-          const toppingResult = await client.query(
-            'SELECT price FROM pizza_toppings WHERE id = $1',
-            [custom.toppingId]
-          )
-          if (toppingResult.rows.length > 0) {
-            unitPrice += parseFloat(toppingResult.rows[0].price) * custom.quantity
-          }
-        }
-      }
-
-      const totalPrice = unitPrice * item.quantity
-
-      await client.query(
-        `INSERT INTO order_items (
-          order_id, product_id, quantity, unit_price, 
-          total_price, special_instructions
-        ) VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          orderId, item.productId, item.quantity,
-          unitPrice, totalPrice, item.specialInstructions || ''
-        ]
-      )
-    }
-
-    // Clear user's cart if authenticated
-    if (userId) {
-      await client.query('DELETE FROM cart_items WHERE cart_id IN (SELECT id FROM shopping_carts WHERE user_id = $1)', [userId])
-      await client.query('DELETE FROM shopping_carts WHERE user_id = $1', [userId])
-    }
-
-    await client.query('COMMIT')
-
-    res.status(201).json({
-      success: true,
-      order: {
-        id: orderId,
-        orderNumber: orderNumber,
-        totalAmount,
-        estimatedDelivery
-      }
-    })
-
-  } catch (error) {
-    await client.query('ROLLBACK')
-    console.error('Error creating order:', error)
-    res.status(500).json({ error: 'Error al crear el pedido' })
-  } finally {
-    client.release()
-  }
+// Health check endpoints
+app.get('/api/health', async (req, res) => {
+  const health = await appModule.healthCheck()
+  res.json(health)
 })
 
-// Get order by number
-app.get('/api/orders/:orderNumber', async (req, res) => {
-  const { orderNumber } = req.params
-
-  try {
-    // Get order details
-    const orderResult = await pool.query(
-      `SELECT o.*, 
-        CASE 
-          WHEN o.estimated_delivery_time > NOW() THEN EXTRACT(EPOCH FROM (o.estimated_delivery_time - NOW()))/60 
-          ELSE 0 
-        END as minutes_remaining
-      FROM orders o 
-      WHERE o.order_number = $1`,
-      [orderNumber]
-    )
-
-    if (orderResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Pedido no encontrado' })
-    }
-
-    const order = orderResult.rows[0]
-
-    // Get order items
-    const itemsResult = await pool.query(
-      `SELECT oi.*, p.image_url
-      FROM order_items oi
-      LEFT JOIN products p ON oi.product_id = p.id
-      WHERE oi.order_id = $1
-      ORDER BY oi.id`,
-      [order.id]
-    )
-
-    // Get status history
-    const historyResult = await pool.query(
-      `SELECT status, notes, created_at
-      FROM order_status_history
-      WHERE order_id = $1
-      ORDER BY created_at ASC`,
-      [order.id]
-    )
-
-    res.json({
-      ...order,
-      items: itemsResult.rows,
-      statusHistory: historyResult.rows
-    })
-
-  } catch (error) {
-    console.error('Error fetching order:', error)
-    res.status(500).json({ error: 'Error interno del servidor' })
-  }
-})
-
-// Get user orders
-app.get('/api/orders', async (req, res) => {
-  const userId = req.query.userId
-  const email = req.query.email
-
-  if (!userId && !email) {
-    return res.status(400).json({ error: 'Se requiere userId o email' })
-  }
-
-  try {
-    let query = `
-      SELECT o.*, 
-        COUNT(oi.id) as total_items,
-        CASE 
-          WHEN o.estimated_delivery_time > NOW() THEN EXTRACT(EPOCH FROM (o.estimated_delivery_time - NOW()))/60 
-          ELSE 0 
-        END as minutes_remaining
-      FROM orders o
-      LEFT JOIN order_items oi ON o.id = oi.order_id
-    `
-    let params = []
-
-    if (userId) {
-      query += ' WHERE o.user_id = $1'
-      params = [userId]
-    } else {
-      query += ' WHERE o.customer_email = $1'
-      params = [email]
-    }
-
-    query += ' GROUP BY o.id ORDER BY o.created_at DESC'
-
-    const result = await pool.query(query, params)
-    res.json(result.rows)
-
-  } catch (error) {
-    console.error('Error fetching user orders:', error)
-    res.status(500).json({ error: 'Error interno del servidor' })
-  }
-})
-
-// Update order status (for admin)
-app.put('/api/orders/:orderNumber/status', async (req, res) => {
-  const { orderNumber } = req.params
-  const { status, notes } = req.body
-
-  const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'delivering', 'delivered', 'cancelled']
-  
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({ error: 'Estado de pedido inválido' })
-  }
-
-  try {
-    const result = await pool.query(
-      'UPDATE orders SET status = $1 WHERE order_number = $2 RETURNING id, status',
-      [status, orderNumber]
-    )
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Pedido no encontrado' })
-    }
-
-    // Add notes if provided
-    if (notes) {
-      await pool.query(
-        'INSERT INTO order_status_history (order_id, status, notes) VALUES ($1, $2, $3)',
-        [result.rows[0].id, status, notes]
-      )
-    }
-
-    res.json({ success: true, status: result.rows[0].status })
-
-  } catch (error) {
-    console.error('Error updating order status:', error)
-    res.status(500).json({ error: 'Error interno del servidor' })
-  }
-})
-
-// Cancel order
-app.put('/api/orders/:orderNumber/cancel', async (req, res) => {
-  const { orderNumber } = req.params
-  const { reason } = req.body
-
-  try {
-    // Only allow cancellation if order is pending or confirmed
-    const result = await pool.query(
-      `UPDATE orders 
-       SET status = 'cancelled' 
-       WHERE order_number = $1 
-       AND status IN ('pending', 'confirmed')
-       RETURNING id, status`,
-      [orderNumber]
-    )
-
-    if (result.rows.length === 0) {
-      return res.status(400).json({ error: 'No se puede cancelar este pedido' })
-    }
-
-    // Log cancellation reason
-    await pool.query(
-      'INSERT INTO order_status_history (order_id, status, notes) VALUES ($1, $2, $3)',
-      [result.rows[0].id, 'cancelled', reason || 'Cancelado por el cliente']
-    )
-
-    res.json({ success: true, status: 'cancelled' })
-
-  } catch (error) {
-    console.error('Error cancelling order:', error)
-    res.status(500).json({ error: 'Error interno del servidor' })
-  }
-})
+app.get('/api/orders/health', appModule.getController('orderController').healthCheck)
+app.get('/api/products/health', appModule.getController('productController').healthCheck)
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

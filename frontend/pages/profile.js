@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { motion } from 'framer-motion'
 import { Clock, Package, CheckCircle, AlertCircle, Eye } from 'lucide-react'
@@ -7,10 +7,22 @@ import { api } from '../lib/api'
 import Link from 'next/link'
 
 export default function ProfilePage() {
-  const { user, logout, isAuthenticated, loading } = useAuth()
+  const { user, token, logout, isAuthenticated, loading, refreshProfile, updateUser } = useAuth()
   const router = useRouter()
   const [userOrders, setUserOrders] = useState([])
   const [ordersLoading, setOrdersLoading] = useState(true)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [profileUser, setProfileUser] = useState(user)
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', phone: '' })
+  const [addresses, setAddresses] = useState([])
+  const [addressesLoading, setAddressesLoading] = useState(false)
+  const [addressForm, setAddressForm] = useState({ id: null, street: '', city: '', state: '', zip_code: '', is_default: false })
+  const [addressErrors, setAddressErrors] = useState({})
+  const [addressModalOpen, setAddressModalOpen] = useState(false)
+  const defaultAddressId = useMemo(() => {
+    const def = addresses.find(a => a.is_default)
+    return def ? def.id : null
+  }, [addresses])
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -21,14 +33,37 @@ export default function ProfilePage() {
   // Fetch user orders
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!user?.id) return
+      if (!user?.id) {
+        console.log('No user ID available')
+        return
+      }
 
       try {
         setOrdersLoading(true)
-        const response = await api.orders.getUserOrders(user.id)
+        console.log('Fetching orders for user:', user.id)
+        console.log('User object:', user)
         
-        // Ensure we always have an array
-        const ordersArray = Array.isArray(response) ? response : []
+        const response = await api.orders.getUserOrders(user.id)
+        console.log('Orders API response:', response)
+        
+        // Normalize response shapes:
+        // Backend returns { success:true, orders:[...], pagination:{} }
+        // apiClient wraps as { success:true, data:{ success:true, orders:[...], ... } }
+        let ordersArray = []
+        if (response?.success) {
+          const payload = response.data || response
+          if (Array.isArray(payload?.orders)) {
+            ordersArray = payload.orders
+          } else if (Array.isArray(payload)) {
+            ordersArray = payload
+          } else if (Array.isArray(payload?.data)) {
+            ordersArray = payload.data
+          }
+        } else if (Array.isArray(response)) {
+          ordersArray = response
+        }
+        
+        console.log('Processed orders array:', ordersArray)
         setUserOrders(ordersArray)
       } catch (error) {
         console.error('Error fetching orders:', error)
@@ -40,8 +75,138 @@ export default function ProfilePage() {
 
     if (isAuthenticated && user?.id) {
       fetchOrders()
+    } else {
+      console.log('Not authenticated or no user ID:', { isAuthenticated, userId: user?.id })
     }
   }, [isAuthenticated, user?.id])
+
+  // Prefill edit form when user loads
+  useEffect(() => {
+    if (user) {
+      setProfileUser(user)
+      setEditForm(prev => ({
+        firstName: prev.firstName || user.firstName || '',
+        lastName: prev.lastName || user.lastName || '',
+        email: user.email || '',
+        phone: prev.phone || user.phone || ''
+      }))
+    }
+  }, [user])
+
+  // Addresses API helpers
+  const fetchAddresses = async () => {
+    if (!user?.id) return
+    try {
+      setAddressesLoading(true)
+      const res = await api.addresses.getForUser(user.id)
+      console.log('Addresses API response:', res)
+      const payload = res?.data || res
+      const list = payload?.addresses || payload?.data || (Array.isArray(payload) ? payload : [])
+      setAddresses(Array.isArray(list) ? list : [])
+    } catch (e) {
+      console.error('Error fetching addresses', e)
+      setAddresses([])
+    } finally {
+      setAddressesLoading(false)
+    }
+  }
+
+  // Auto-load addresses when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && user?.id && token) {
+      fetchAddresses()
+    }
+  }, [isAuthenticated, user?.id, token])
+
+  const saveUserProfile = async () => {
+    try {
+      const firstName = (editForm.firstName || '').trim() || profileUser?.firstName || user?.firstName || ''
+      const lastName = (editForm.lastName || '').trim() || profileUser?.lastName || user?.lastName || ''
+      if (!firstName || !lastName) {
+        alert('Por favor, complete nombre y apellido')
+        return
+      }
+      const payload = { firstName, lastName, phone: (editForm.phone || '').trim() }
+      const res = await api.auth.updateProfile(payload)
+      if (res?.success) {
+        // Optimistic update for immediate UI change
+        updateUser(payload)
+        setProfileUser(prev => ({ ...prev, ...payload }))
+        // Then fetch fresh profile once (no cache) to ensure consistency
+        refreshProfile().then(fresh => {
+          if (fresh) setProfileUser(fresh)
+        })
+        setIsEditOpen(false)
+      } else if (res?.error) {
+        alert(res.error)
+      }
+    } catch (e) {
+      console.error('Failed to save profile', e)
+      alert('No se pudo guardar. Inténtalo de nuevo.')
+    }
+  }
+
+  const openAddressModal = (addr = null) => {
+    if (addr) setAddressForm({ id: addr.id, street: addr.street, city: addr.city, state: addr.state, zip_code: addr.zip_code, is_default: !!addr.is_default })
+    else setAddressForm({ id: null, street: '', city: '', state: '', zip_code: '', is_default: false })
+    setAddressErrors({})
+    setAddressModalOpen(true)
+  }
+
+  const validateAddress = () => {
+    const errs = {}
+    if (!addressForm.street.trim()) errs.street = 'Requerido'
+    if (!addressForm.city.trim()) errs.city = 'Requerido'
+    if (!addressForm.state.trim()) errs.state = 'Requerido'
+    if (!addressForm.zip_code.trim()) errs.zip_code = 'Requerido'
+    setAddressErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  const saveAddress = async () => {
+    try {
+      if (!validateAddress()) return
+      console.log('Saving address payload:', addressForm)
+      const res = addressForm.id
+        ? await api.addresses.update(user.id, addressForm.id, addressForm)
+        : await api.addresses.create(user.id, addressForm)
+      console.log('Address save response:', res)
+      if (!res?.success) {
+        alert(res?.error || 'No se pudo guardar la dirección')
+        return
+      }
+      setAddressModalOpen(false)
+      // force a fresh fetch with no cache and re-render list immediately
+      await fetchAddresses()
+    } catch (e) {
+      console.error('Failed to save address', e)
+      alert('Error de conexión al guardar la dirección')
+    }
+  }
+
+  const deleteAddress = async (id) => {
+    try {
+      await api.addresses.delete(user.id, id)
+      await fetchAddresses()
+    } catch (e) {
+      console.error('Failed to delete address', e)
+    }
+  }
+
+  const setDefaultAddress = async (addr) => {
+    try {
+      await api.addresses.update(user.id, addr.id, {
+        street: addr.street,
+        city: addr.city,
+        state: addr.state,
+        zip_code: addr.zip_code,
+        is_default: true
+      })
+      await fetchAddresses()
+    } catch (e) {
+      console.error('Failed to set default address', e)
+    }
+  }
 
   const handleLogout = () => {
     logout()
@@ -100,7 +265,7 @@ export default function ProfilePage() {
       <div className="bg-gradient-to-r from-primary to-red-500 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <h1 className="text-5xl md:text-6xl font-bold mb-4">Mi Perfil</h1>
-          <p className="text-xl opacity-90">Bienvenido de vuelta, {user?.firstName}!</p>
+          <p className="text-xl opacity-90">Bienvenido de vuelta, {profileUser?.firstName}!</p>
         </div>
       </div>
 
@@ -110,7 +275,7 @@ export default function ProfilePage() {
           <div className="md:col-span-2 bg-white rounded-2xl shadow-xl p-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-3xl font-bold text-gray-800">Información Personal</h2>
-              <button className="text-primary hover:text-primary/80 font-medium">
+              <button className="text-primary hover:text-primary/80 font-medium" onClick={() => setIsEditOpen(true)}>
                 Editar
               </button>
             </div>
@@ -121,7 +286,7 @@ export default function ProfilePage() {
                   Nombre
                 </label>
                 <p className="text-lg text-gray-800 font-semibold">
-                  {user?.firstName}
+                  {profileUser?.firstName}
                 </p>
               </div>
 
@@ -130,7 +295,7 @@ export default function ProfilePage() {
                   Apellido
                 </label>
                 <p className="text-lg text-gray-800 font-semibold">
-                  {user?.lastName}
+                  {profileUser?.lastName}
                 </p>
               </div>
 
@@ -139,7 +304,7 @@ export default function ProfilePage() {
                   Email
                 </label>
                 <p className="text-lg text-gray-800 font-semibold">
-                  {user?.email}
+                  {profileUser?.email}
                 </p>
               </div>
 
@@ -148,7 +313,7 @@ export default function ProfilePage() {
                   Teléfono
                 </label>
                 <p className="text-lg text-gray-800 font-semibold">
-                  {user?.phone}
+                  {profileUser?.phone}
                 </p>
               </div>
             </div>
@@ -165,6 +330,46 @@ export default function ProfilePage() {
                 </Link>
               </div>
             </div>
+
+            {/* Addresses Section - Wide layout (better space) */}
+            <div className="mt-8 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-gray-800">📍 Direcciones</h3>
+                <button
+                  onClick={() => openAddressModal(null)}
+                  disabled={addresses.length >= 4}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${addresses.length >= 4 ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary/90'}`}
+                >
+                  Añadir
+                </button>
+              </div>
+              {addressesLoading ? (
+                <p className="text-gray-500">Cargando...</p>
+              ) : addresses.length === 0 ? (
+                <p className="text-gray-600">No tienes direcciones guardadas.</p>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {addresses.slice(0, 4).map(addr => (
+                    <div key={addr.id} className="border rounded-xl p-4 flex flex-col">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold text-gray-900 truncate mr-2">{addr.street}</p>
+                          {defaultAddressId === addr.id && (
+                            <span className="inline-flex items-center text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 whitespace-nowrap">Predeterminada</span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-gray-600 break-words">{addr.city}, {addr.state} {addr.zip_code}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 justify-end mt-3">
+                        <button className="px-3 py-1 rounded-lg bg-gray-100 text-sm" onClick={() => openAddressModal(addr)}>Editar</button>
+                        <button className="px-3 py-1 rounded-lg bg-red-500 text-white text-sm" onClick={() => deleteAddress(addr.id)}>Eliminar</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-gray-500">Máximo 4 direcciones guardadas.</p>
+            </div>
           </div>
 
           {/* Profile Summary & Actions */}
@@ -173,11 +378,11 @@ export default function ProfilePage() {
             <div className="bg-white rounded-2xl shadow-xl p-6 text-center">
               <div className="w-20 h-20 bg-gradient-to-r from-primary to-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl text-white font-bold">
-                  {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
+                  {profileUser?.firstName?.charAt(0)}{profileUser?.lastName?.charAt(0)}
                 </span>
               </div>
               <h3 className="text-xl font-bold text-gray-800">
-                {user?.firstName} {user?.lastName}
+                {profileUser?.firstName} {profileUser?.lastName}
               </h3>
               <p className="text-gray-600 text-sm mt-1">Cliente Premium</p>
               
@@ -187,27 +392,19 @@ export default function ProfilePage() {
                     {ordersLoading ? '...' : userOrders.length}
                   </div>
                   <div className="text-sm text-gray-600">Pedidos Realizados</div>
+                  {/* Debug info - remove after fixing */}
+                  <div className="text-xs text-gray-400 mt-2">
+                    User ID: {user?.id || 'undefined'} | Orders: {userOrders.length}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Account Settings */}
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Configuración</h3>
-              <div className="space-y-3">
-                <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
-                  🔔 Notificaciones
-                </button>
-                <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
-                  📍 Direcciones
-                </button>
-                <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
-                  💳 Métodos de Pago
-                </button>
-                <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
-                  🔒 Privacidad
-                </button>
-              </div>
+            {/* Account Settings - removed for now as requested */}
+
+            {/* Addresses Section (old, sidebar) hidden to avoid duplicate rendering */}
+            <div className="hidden">
+              {/* intentionally hidden */}
             </div>
 
             {/* Logout Button */}
@@ -310,6 +507,111 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
+
+        {/* Edit Profile Modal */}
+        {isEditOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Editar Información</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Nombre</label>
+                  <input required className="w-full px-4 py-3 border rounded-lg" value={editForm.firstName} onChange={e => setEditForm(f => ({...f, firstName: e.target.value}))} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Apellido</label>
+                  <input required className="w-full px-4 py-3 border rounded-lg" value={editForm.lastName} onChange={e => setEditForm(f => ({...f, lastName: e.target.value}))} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+                  <input disabled className="w-full px-4 py-3 border rounded-lg bg-gray-100" value={editForm.email} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Teléfono</label>
+                  <input className="w-full px-4 py-3 border rounded-lg" value={editForm.phone} onChange={e => setEditForm(f => ({...f, phone: e.target.value}))} />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button className="px-4 py-2 rounded-lg bg-gray-100" onClick={() => setIsEditOpen(false)}>Cancelar</button>
+                <button className="px-6 py-2 rounded-lg bg-primary text-white" onClick={saveUserProfile}>Guardar</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Addresses Modal (Add/Edit + List) */}
+        {addressModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-2xl font-bold text-gray-800">Direcciones</h3>
+                <button onClick={() => setAddressModalOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Address form */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Calle y número</label>
+                    <input className={`w-full px-4 py-3 border rounded-lg ${addressErrors.street ? 'border-red-300' : 'border-gray-300'}`} value={addressForm.street} onChange={e => setAddressForm(f => ({...f, street: e.target.value}))} />
+                    {addressErrors.street && <p className="text-xs text-red-600 mt-1">{addressErrors.street}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Ciudad</label>
+                    <input className={`w-full px-4 py-3 border rounded-lg ${addressErrors.city ? 'border-red-300' : 'border-gray-300'}`} value={addressForm.city} onChange={e => setAddressForm(f => ({...f, city: e.target.value}))} />
+                    {addressErrors.city && <p className="text-xs text-red-600 mt-1">{addressErrors.city}</p>}
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Provincia</label>
+                      <input className={`w-full px-4 py-3 border rounded-lg ${addressErrors.state ? 'border-red-300' : 'border-gray-300'}`} value={addressForm.state} onChange={e => setAddressForm(f => ({...f, state: e.target.value}))} />
+                      {addressErrors.state && <p className="text-xs text-red-600 mt-1">{addressErrors.state}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">CP</label>
+                      <input className={`w-full px-4 py-3 border rounded-lg ${addressErrors.zip_code ? 'border-red-300' : 'border-gray-300'}`} value={addressForm.zip_code} onChange={e => setAddressForm(f => ({...f, zip_code: e.target.value}))} />
+                      {addressErrors.zip_code && <p className="text-xs text-red-600 mt-1">{addressErrors.zip_code}</p>}
+                    </div>
+                  </div>
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={addressForm.is_default} onChange={e => setAddressForm(f => ({...f, is_default: e.target.checked}))} />
+                    Usar como dirección predeterminada
+                  </label>
+                  <div className="flex gap-3">
+                    <button className="px-4 py-2 rounded-lg bg-gray-100" onClick={() => setAddressModalOpen(false)}>Cancelar</button>
+                    <button className="px-6 py-2 rounded-lg bg-primary text-white" onClick={saveAddress}>{addressForm.id ? 'Guardar cambios' : 'Añadir dirección'}</button>
+                  </div>
+                </div>
+
+                {/* Address list */}
+                <div>
+                  <h4 className="font-semibold text-gray-800 mb-3">Guardadas</h4>
+                  {addressesLoading ? (
+                    <p className="text-gray-500">Cargando...</p>
+                  ) : addresses.length === 0 ? (
+                    <p className="text-gray-500">No tienes direcciones guardadas.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {addresses.map(addr => (
+                        <div key={addr.id} className="border rounded-lg p-3 flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-gray-800">{addr.street}</p>
+                            <p className="text-sm text-gray-600">{addr.city}, {addr.state} {addr.zip_code}</p>
+                            {addr.is_default && <span className="text-xs text-green-600">Predeterminada</span>}
+                          </div>
+                          <div className="flex gap-2">
+                            <button className="px-3 py-1 rounded-lg bg-gray-100" onClick={() => openAddressModal(addr)}>Editar</button>
+                            <button className="px-3 py-1 rounded-lg bg-red-500 text-white" onClick={() => deleteAddress(addr.id)}>Eliminar</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

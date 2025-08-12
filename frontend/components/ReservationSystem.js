@@ -10,7 +10,7 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
     guests: 2,
     name: user?.firstName ? `${user.firstName} ${user.lastName}` : '',
     email: user?.email || '',
-    phone: '',
+    phone: user?.phone || '',
     specialRequests: ''
   })
   const [availableSlots, setAvailableSlots] = useState([])
@@ -44,6 +44,18 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
         .finally(() => setLoading(false))
     }
   }, [formData.date])
+
+  // Prefill contact data from authenticated user when available, without overriding user edits
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: prev.name && prev.name.trim().length > 0 ? prev.name : `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        email: prev.email && prev.email.trim().length > 0 ? prev.email : (user.email || ''),
+        phone: prev.phone && prev.phone.trim().length > 0 ? prev.phone : (user.phone || '')
+      }))
+    }
+  }, [user])
 
   const handleChange = (e) => {
     setFormData({
@@ -355,7 +367,7 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
                 guests: 2,
                 name: user?.firstName ? `${user.firstName} ${user.lastName}` : '',
                 email: user?.email || '',
-                phone: '',
+                phone: user?.phone || '',
                 specialRequests: ''
               })
             }}
@@ -399,9 +411,9 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
         )}
         
         <div className="p-6">
-          {step === 1 && <DateTimeStep />}
-          {step === 2 && <ContactStep />}
-          {step === 3 && <ConfirmationStep />}
+          {step === 1 && DateTimeStep()}
+          {step === 2 && ContactStep()}
+          {step === 3 && ConfirmationStep()}
         </div>
       </div>
     </div>

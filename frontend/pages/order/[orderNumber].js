@@ -49,7 +49,25 @@ export default function OrderTrackingPage() {
     try {
       setRefreshing(true)
       const response = await api.orders.getByNumber(orderNumber)
-      setOrder(response)
+      const data = response?.data || response
+      // Normalize numeric and field names coming from DB
+      const normalized = {
+        ...data,
+        created_at: data?.created_at || data?.order_date,
+        subtotal: data?.subtotal !== undefined ? parseFloat(data.subtotal) : (data?.total_amount != null && data?.delivery_fee != null ? (parseFloat(data.total_amount) - parseFloat(data.delivery_fee)) : 0),
+        total_amount: data?.total_amount !== undefined ? parseFloat(data.total_amount) : 0,
+        delivery_fee: data?.delivery_fee !== undefined ? parseFloat(data.delivery_fee) : 0,
+        delivery_address_text: data?.delivery_address_text || data?.delivery_address,
+        items: Array.isArray(data?.items)
+          ? data.items.map(it => ({
+              ...it,
+              unit_price: it?.unit_price !== undefined ? parseFloat(it.unit_price) : it?.unitPrice,
+              total_price: it?.total_price !== undefined ? parseFloat(it.total_price) : it?.totalPrice,
+              customizations: Array.isArray(it?.customizations) ? it.customizations : []
+            }))
+          : []
+      }
+      setOrder(normalized)
       setError(null)
     } catch (err) {
       console.error('Error fetching order:', err)
@@ -205,7 +223,7 @@ export default function OrderTrackingPage() {
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => router.push('/menu')}
+            onClick={() => router.push('/profile')}
             className="p-2 rounded-full hover:bg-white/50 transition-colors"
           >
             <ArrowLeft className="w-6 h-6 text-gray-600" />
@@ -327,16 +345,16 @@ export default function OrderTrackingPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal</span>
-                    <span className="font-medium">{formatPrice(order.total_amount - order.delivery_fee)}</span>
+                    <span className="font-medium">{formatPrice(order.subtotal || 0)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Gastos de envío</span>
-                    <span className="font-medium">{formatPrice(order.delivery_fee)}</span>
+                    <span className="font-medium">{formatPrice(order.delivery_fee || 0)}</span>
                   </div>
                   <div className="border-t border-gray-200 pt-2">
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
-                      <span className="text-primary">{formatPrice(order.total_amount)}</span>
+                      <span className="text-primary">{formatPrice(order.total_amount || 0)}</span>
                     </div>
                   </div>
                 </div>
@@ -355,10 +373,10 @@ export default function OrderTrackingPage() {
                         {order.delivery_type === 'pickup' ? 'Bella Vista Restaurant' : 'Dirección de entrega'}
                       </p>
                       <p className="text-gray-600">
-                        {order.delivery_type === 'pickup' 
+                         {order.delivery_type === 'pickup' 
                           ? 'Calle Gran Vía, 123, Madrid'
-                          : order.delivery_address
-                        }
+                          : (order.delivery_address_text || '')
+                         }
                       </p>
                     </div>
                   </div>

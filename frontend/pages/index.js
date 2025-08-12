@@ -11,29 +11,44 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50">
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-20 left-20 w-32 h-32 bg-primary rounded-full"></div>
-          <div className="absolute top-40 right-32 w-24 h-24 bg-red-400 rounded-full"></div>
-          <div className="absolute bottom-32 left-1/4 w-40 h-40 bg-orange-300 rounded-full"></div>
-          <div className="absolute bottom-20 right-20 w-28 h-28 bg-primary rounded-full"></div>
+      <section className="relative min-h-screen md:min-h-screen flex items-center justify-center overflow-hidden" style={{ minHeight: '100vh' }}>
+        {/* Video Background */}
+        <div className="absolute inset-0 z-0 bg-black">
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="object-cover w-full h-full md:object-cover"
+            style={{ 
+              width: '100vw', 
+              height: '100vh',
+              objectPosition: 'center center',
+              minHeight: '100vh',
+              minWidth: '100vw'
+            }}
+            onLoadedData={() => console.log('Video loaded successfully')}
+            onError={(e) => console.error('Video error:', e)}
+          >
+            <source src="/videos/pizzacomercial2.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
         </div>
+        
+        {/* White Overlay for Better Text Readability */}
+        <div className="absolute inset-0 z-0 bg-white opacity-60"></div>
 
-        <div className="relative z-10 text-center px-4 max-w-6xl mx-auto pt-20">
+        <div className="relative z-10 text-center px-4 max-w-6xl mx-auto pt-8 md:pt-20">
                                 {/* Main Hero Content */}
                       <div className="mb-8">
-                        <span className="inline-block px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-semibold mb-4">
-                          {isAuthenticated ? `👋 ¡Bienvenido de vuelta, ${user?.firstName}!` : '🍕 Auténtica Pizza Italiana'}
-                        </span>
-            <h1 className="text-6xl md:text-8xl font-bold text-gray-900 mb-6 leading-tight">
-              <span className="bg-gradient-to-r from-primary to-red-500 bg-clip-text text-transparent">
+            <h1 className="text-6xl md:text-8xl font-bold text-gray-900 mb-6 leading-tight drop-shadow-lg">
+              <span className="bg-gradient-to-r from-primary to-red-500 bg-clip-text text-transparent drop-shadow-lg">
                 Bella Vista
               </span>
               <br />
-              <span className="text-gray-800">Restaurant</span>
+              <span className="text-gray-900 drop-shadow-lg">Restaurant</span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-xl md:text-2xl text-gray-800 mb-8 max-w-3xl mx-auto leading-relaxed drop-shadow-md">
               Descubre el auténtico sabor italiano con nuestras pizzas artesanales, 
               hechas con ingredientes frescos y recetas tradicionales.
             </p>
@@ -55,35 +70,26 @@ export default function HomePage() {
                           🍽️ Reservar Mesa
                         </button>
                         
-                        {isAuthenticated ? (
-                          <Link href="/profile" className="px-8 py-4 bg-green-500 text-white rounded-full text-lg font-bold hover:bg-green-600 transition-all duration-300 transform hover:scale-105 shadow-xl">
+                        {isAuthenticated && (
+                          <Link href="/profile" className="hidden md:inline-block px-8 py-4 bg-green-500 text-white rounded-full text-lg font-bold hover:bg-green-600 transition-all duration-300 transform hover:scale-105 shadow-xl">
                             👤 Mi Perfil
                           </Link>
-                        ) : (
-                          <div className="flex flex-col sm:flex-row gap-3">
-                            <Link href="/register" className="px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full text-lg font-bold hover:from-green-600 hover:to-green-700 transition-all duration-300 transform hover:scale-105 shadow-xl">
-                              🚀 Registro Gratis
-                            </Link>
-                            <Link href="/login" className="px-6 py-4 bg-transparent border-2 border-gray-700 text-gray-700 rounded-full text-lg font-bold hover:bg-gray-700 hover:text-white transition-all duration-300 transform hover:scale-105">
-                              Iniciar Sesión
-                            </Link>
-                          </div>
                         )}
                       </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto">
+          <div className="grid grid-cols-3 gap-2 md:gap-8 max-w-3xl mx-auto">
             <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">20+</div>
-              <div className="text-gray-600">Pizzas Únicas</div>
+              <div className="text-2xl md:text-4xl font-bold text-primary mb-2 drop-shadow-lg">20+</div>
+              <div className="text-sm md:text-base text-gray-800 font-semibold drop-shadow-md">Pizzas Únicas</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">15min</div>
-              <div className="text-gray-600">Tiempo Promedio</div>
+              <div className="text-2xl md:text-4xl font-bold text-primary mb-2 drop-shadow-lg">15min</div>
+              <div className="text-sm md:text-base text-gray-800 font-semibold drop-shadow-md">Tiempo Promedio</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">4.9★</div>
-              <div className="text-gray-600">Valoración</div>
+              <div className="text-2xl md:text-4xl font-bold text-primary mb-2 drop-shadow-lg">4.9★</div>
+              <div className="text-sm md:text-base text-gray-800 font-semibold drop-shadow-md">Valoración</div>
             </div>
           </div>
         </div>
@@ -112,7 +118,7 @@ export default function HomePage() {
             {/* Feature 1 */}
             <div className="group text-center p-8 rounded-2xl bg-gradient-to-br from-orange-50 to-red-50 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
               <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                <span className="text-2xl">🍕</span>
+                <span className="text-4xl">🌿</span>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">Ingredientes Frescos</h3>
               <p className="text-gray-600 leading-relaxed">
@@ -123,7 +129,7 @@ export default function HomePage() {
             {/* Feature 2 */}
             <div className="group text-center p-8 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
               <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                <span className="text-2xl">🚚</span>
+                <span className="text-4xl">⚡</span>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">Entrega Rápida</h3>
               <p className="text-gray-600 leading-relaxed">
@@ -134,7 +140,7 @@ export default function HomePage() {
             {/* Feature 3 */}
             <div className="group text-center p-8 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
               <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                <span className="text-2xl">💻</span>
+                <span className="text-4xl">📱</span>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">Pedido Online</h3>
               <p className="text-gray-600 leading-relaxed">
@@ -258,10 +264,21 @@ export default function HomePage() {
             </div>
             <div>
               <h4 className="font-bold mb-4">Síguenos</h4>
-              <div className="flex space-x-4">
-                <span className="text-2xl cursor-pointer hover:text-primary transition-colors">📘</span>
-                <span className="text-2xl cursor-pointer hover:text-primary transition-colors">📷</span>
-                <span className="text-2xl cursor-pointer hover:text-primary transition-colors">🐦</span>
+              <div className="flex flex-col sm:flex-row justify-start items-center gap-6">
+                <div className="flex gap-4">
+                  <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="group w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 transition-all duration-300 hover:scale-110 shadow-lg" aria-label="Síguenos en Facebook">
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"></path></svg>
+                  </a>
+                  <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="group w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-500 rounded-full flex items-center justify-center text-white hover:from-purple-700 hover:to-pink-600 transition-all duration-300 hover:scale-110 shadow-lg" aria-label="Síguenos en Instagram">
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"></path></svg>
+                  </a>
+                  <a href="https://google.com" target="_blank" rel="noopener noreferrer" className="group w-12 h-12 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-all duration-300 hover:scale-110 shadow-lg" aria-label="Encuéntranos en Google">
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"></path><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"></path><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"></path><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"></path></svg>
+                  </a>
+                  <a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="group w-12 h-12 bg-green-500 rounded-full flex items-center justify-center text-white hover:bg-green-600 transition-all duration-300 hover:scale-110 shadow-lg" aria-label="Contáctanos por WhatsApp">
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.465 3.488"></path></svg>
+                  </a>
+                </div>
               </div>
             </div>
           </div>

@@ -151,7 +151,18 @@ export function CartProvider({ children }) {
       if (user) {
         const result = await api.cart.get()
         if (result.success && result.data) {
-          dispatch({ type: CART_ACTIONS.SET_CART, payload: result.data })
+          console.log('Cart loaded from server:', result.data)
+          // Transform server data to match local structure
+          const transformedCart = {
+            ...result.data,
+            items: result.data.items?.map(item => ({
+              ...item,
+              base_price: item.base_price || item.price || item.unit_price || 0,
+              total_price: item.total_price || (item.price || item.unit_price || 0) * item.quantity
+            })) || []
+          }
+          console.log('Transformed cart:', transformedCart)
+          dispatch({ type: CART_ACTIONS.SET_CART, payload: transformedCart })
         }
       }
     } catch (error) {
