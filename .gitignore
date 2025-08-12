@@ -52,3 +52,6 @@ backend/.env
 # Misc
 *.tgz
 .cache/
+
+# Public/videos folder
+public/videos/
