@@ -175,6 +175,9 @@ export const api = {
     }),
     logout: () => apiClient.post(API_ENDPOINTS.LOGOUT, {}, {
       headers: apiClient.getAuthHeaders()
+    }),
+    deleteAccount: () => apiClient.delete('/api/auth/account', {
+      headers: apiClient.getAuthHeaders()
     })
   },
 

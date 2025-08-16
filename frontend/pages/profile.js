@@ -19,6 +19,8 @@ export default function ProfilePage() {
   const [addressForm, setAddressForm] = useState({ id: null, street: '', city: '', state: '', zip_code: '', is_default: false })
   const [addressErrors, setAddressErrors] = useState({})
   const [addressModalOpen, setAddressModalOpen] = useState(false)
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false)
   const defaultAddressId = useMemo(() => {
     const def = addresses.find(a => a.is_default)
     return def ? def.id : null
@@ -211,6 +213,31 @@ export default function ProfilePage() {
   const handleLogout = () => {
     logout()
     router.push('/')
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!confirm('¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer.')) {
+      return
+    }
+
+    try {
+      setDeleteAccountLoading(true)
+      const result = await api.auth.deleteAccount()
+      
+      if (result.success) {
+        alert('Tu cuenta ha sido eliminada exitosamente.')
+        logout()
+        router.push('/')
+      } else {
+        alert(result.error || 'Error al eliminar la cuenta. Inténtalo de nuevo.')
+      }
+    } catch (error) {
+      console.error('Failed to delete account:', error)
+      alert('Error de conexión al eliminar la cuenta. Inténtalo de nuevo.')
+    } finally {
+      setDeleteAccountLoading(false)
+      setShowDeleteAccountModal(false)
+    }
   }
 
   const formatPrice = (price) => {
@@ -416,6 +443,21 @@ export default function ProfilePage() {
                 🚪 Cerrar Sesión
               </button>
             </div>
+
+            {/* Delete Account Button */}
+            <div className="bg-white rounded-2xl shadow-xl p-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">⚠️ Zona de Peligro</h3>
+              <p className="text-sm text-gray-600 mb-4 text-center">
+                Esta acción eliminará permanentemente tu cuenta y todos tus datos.
+              </p>
+              <button
+                onClick={() => setShowDeleteAccountModal(true)}
+                disabled={deleteAccountLoading}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white py-3 px-4 rounded-lg font-semibold transition-colors"
+              >
+                {deleteAccountLoading ? '🔄 Eliminando...' : '🗑️ Eliminar Cuenta'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -608,6 +650,49 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Account Confirmation Modal */}
+        {showDeleteAccountModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">¿Eliminar Cuenta?</h3>
+                <p className="text-gray-600 mb-6">
+                  Esta acción es <strong>irreversible</strong>. Se eliminará permanentemente:
+                </p>
+                <ul className="text-left text-sm text-gray-600 mb-6 space-y-2">
+                  <li>• Tu cuenta de usuario</li>
+                  <li>• Todas tus direcciones guardadas</li>
+                  <li>• Tu carrito de compras</li>
+                  <li>• La asociación con tus pedidos anteriores</li>
+                </ul>
+                <p className="text-sm text-gray-500 mb-6">
+                  <strong>Nota:</strong> Los pedidos se mantienen en el sistema pero sin asociación a tu cuenta.
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteAccountModal(false)}
+                  disabled={deleteAccountLoading}
+                  className="flex-1 px-4 py-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteAccountLoading}
+                  className="flex-1 px-4 py-3 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold transition-colors"
+                >
+                  {deleteAccountLoading ? '🔄 Eliminando...' : 'Sí, Eliminar Cuenta'}
+                </button>
               </div>
             </div>
           </div>

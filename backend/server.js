@@ -365,6 +365,67 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
   }
 })
 
+// Delete account endpoint
+app.delete('/api/auth/account', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log('DELETE /api/auth/account - User ID:', userId);
+
+    const client = await pool.connect();
+    try {
+      // Start transaction
+      await client.query('BEGIN');
+
+      // Delete user's addresses
+      await client.query('DELETE FROM addresses WHERE user_id = $1', [userId]);
+      console.log('Deleted addresses for user:', userId);
+
+      // Delete user's cart items and cart
+      await client.query('DELETE FROM cart_items WHERE cart_id IN (SELECT id FROM shopping_carts WHERE user_id = $1)', [userId]);
+      await client.query('DELETE FROM shopping_carts WHERE user_id = $1', [userId]);
+      console.log('Deleted shopping cart for user:', userId);
+
+      // Delete user's orders (keep order history but remove user association)
+      await client.query('UPDATE orders SET user_id = NULL WHERE user_id = $1', [userId]);
+      console.log('Removed user association from orders for user:', userId);
+
+      // Finally, delete the user
+      const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING id, email', [userId]);
+      
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
+      // Commit transaction
+      await client.query('COMMIT');
+      
+      console.log('Account deleted successfully for user:', userId);
+      
+      res.json({
+        success: true,
+        message: 'Cuenta eliminada exitosamente',
+        deletedUser: {
+          id: result.rows[0].id,
+          email: result.rows[0].email
+        }
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error('Account deletion error:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor al eliminar la cuenta' 
+    });
+  }
+});
+
 // Products Routes (existing)
 app.get('/api/products', async (req, res) => {
   try {
