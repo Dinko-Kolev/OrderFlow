@@ -211,6 +211,13 @@ export default function CheckoutPage() {
     }
   }
 
+  // CAPTCHA timeout handler
+  const handleCaptchaTimeout = () => {
+    console.log('⏰ CAPTCHA verification timeout');
+    setCaptchaLoading(false);
+    setErrors(prev => ({ ...prev, captcha: 'Tiempo de espera agotado. Inténtalo de nuevo.' }));
+  }
+
   // Save new address
   const saveAddress = async () => {
     try {
@@ -841,7 +848,7 @@ export default function CheckoutPage() {
                     
                     {!captchaVerified ? (
                       <div className="space-y-3">
-                        <CAPTCHA ref={captchaRef} onVerify={handleCaptchaVerify} action="order">
+                        <CAPTCHA ref={captchaRef} onVerify={handleCaptchaVerify} onTimeout={handleCaptchaTimeout} action="order">
                           <button
                             type="button"
                             onClick={() => {

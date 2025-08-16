@@ -4,17 +4,41 @@ import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
  * Google reCAPTCHA v3 Component
  * Provides invisible CAPTCHA verification for guest orders
  */
-const CAPTCHA = forwardRef(({ onVerify, action = 'order', children }, ref) => {
+const CAPTCHA = forwardRef(({ onVerify, onTimeout, action = 'order', children }, ref) => {
   const recaptchaRef = useRef(null);
+  const timeoutRef = useRef(null);
 
   const executeRecaptcha = async () => {
     try {
-      if (typeof window.grecaptcha === 'undefined') {
-        console.error('Google reCAPTCHA not loaded');
-        throw new Error('CAPTCHA service not available');
+      console.log('🔄 Starting CAPTCHA verification...');
+      console.log('🌍 Environment:', process.env.NODE_ENV);
+      console.log('🔑 Site key:', process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI');
+      console.log('🌐 Window object:', typeof window !== 'undefined');
+      console.log('🔒 reCAPTCHA available:', isRecaptchaAvailable());
+      
+      // Check if reCAPTCHA is available
+      if (!isRecaptchaAvailable()) {
+        console.error('Google reCAPTCHA not available');
+        
+        // In development, provide a mock token
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔄 Development mode: Using mock CAPTCHA token');
+          onVerify('mock_recaptcha_token_dev');
+          return;
+        } else {
+          throw new Error('CAPTCHA service not available');
+        }
       }
 
       const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+      
+      // Set up timeout handler
+      if (onTimeout) {
+        timeoutRef.current = setTimeout(() => {
+          console.log('⏰ CAPTCHA verification timeout triggered');
+          onTimeout();
+        }, 12000); // 12 seconds timeout (slightly longer than the 10s Promise timeout)
+      }
       
       // Add timeout to prevent hanging
       const token = await Promise.race([
@@ -34,6 +58,12 @@ const CAPTCHA = forwardRef(({ onVerify, action = 'order', children }, ref) => {
         )
       ]);
 
+      // Clear timeout since we got a response
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
       // Validate token before calling onVerify
       if (!token || typeof token !== 'string') {
         throw new Error('Invalid CAPTCHA token received');
@@ -45,16 +75,33 @@ const CAPTCHA = forwardRef(({ onVerify, action = 'order', children }, ref) => {
     } catch (error) {
       console.error('❌ reCAPTCHA execution failed:', error);
       
+      // Clear timeout since we got an error
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
       // For development/testing, provide a mock token
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Using mock CAPTCHA token for development');
+        console.log('🔄 Development mode: Using mock CAPTCHA token after error');
         onVerify('mock_recaptcha_token_dev');
       } else {
-        // In production, call onVerify with null to indicate failure
-        onVerify(null);
+        // In production, don't call onVerify with null - let the parent handle the error
+        console.log('🚫 CAPTCHA verification failed in production mode');
+        // We'll let the parent component handle this by not calling onVerify
+        // The parent should have a timeout mechanism to detect when CAPTCHA doesn't respond
       }
     }
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // Expose execute function to parent component
   useImperativeHandle(ref, () => ({
@@ -85,6 +132,14 @@ const CAPTCHA = forwardRef(({ onVerify, action = 'order', children }, ref) => {
       }
     };
   }, []);
+
+  // Check if reCAPTCHA is available
+  const isRecaptchaAvailable = () => {
+    return typeof window !== 'undefined' && 
+           typeof window.grecaptcha !== 'undefined' && 
+           typeof window.grecaptcha.ready === 'function' &&
+           typeof window.grecaptcha.execute === 'function';
+  };
 
   return (
     <div ref={recaptchaRef} data-recaptcha>
