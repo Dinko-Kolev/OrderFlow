@@ -2,6 +2,7 @@ const OrderService = require('./OrderService')
 const { ValidationService } = require('./ValidationService')
 const { RateLimitService } = require('./RateLimitService')
 const { CAPTCHAService } = require('./CAPTCHAService')
+const { StripeService } = require('./StripeService')
 const { asyncHandler, ValidationError } = require('../utils/errors')
 
 /**
@@ -14,6 +15,7 @@ class OrderController {
     this.validationService = new ValidationService()
     this.rateLimitService = new RateLimitService()
     this.captchaService = new CAPTCHAService()
+    this.stripeService = new StripeService()
   }
 
   /**
@@ -182,10 +184,79 @@ class OrderController {
       }
     })
 
+    // STRIPE PAYMENT INTEGRATION
+    let paymentIntent = null;
+    let stripeCustomer = null;
+
+    // If payment method is Stripe, create payment intent first
+    if (paymentMethod === 'stripe') {
+      try {
+        console.log('💰 Processing Stripe payment for order...');
+        
+        // Calculate total amount (including delivery fee)
+        const subtotal = validatedItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+        const totalAmount = subtotal + (deliveryType === 'delivery' ? 2.50 : 0);
+        
+        // Create or get Stripe customer
+        if (customerEmail) {
+          try {
+            stripeCustomer = await this.stripeService.createCustomer(
+              customerEmail,
+              customerName,
+              customerPhone
+            );
+            console.log('✅ Stripe customer created/retrieved:', stripeCustomer.id);
+          } catch (error) {
+            console.error('⚠️ Failed to create Stripe customer, continuing with order:', error.message);
+          }
+        }
+
+        // Create payment intent
+        paymentIntent = await this.stripeService.createPaymentIntent(
+          totalAmount,
+          'usd',
+          {
+            orderType: 'pizza_order',
+            customerEmail: customerEmail,
+            customerName: customerName,
+            customerPhone: customerPhone
+          }
+        );
+
+        console.log('✅ Payment intent created:', paymentIntent.id);
+        
+        // Add Stripe data to order
+        orderData.stripe_payment_intent_id = paymentIntent.id;
+        if (stripeCustomer) {
+          orderData.stripe_customer_id = stripeCustomer.id;
+        }
+        orderData.payment_status = 'pending';
+        
+      } catch (error) {
+        console.error('❌ Stripe payment setup failed:', error);
+        throw new ValidationError(`Payment setup failed: ${error.message}`);
+      }
+    }
+
     // Create order using service
     const result = await this.orderService.createOrder(orderData, validatedItems)
 
-    res.status(201).json(result)
+    // Return order with payment intent if using Stripe
+    if (paymentMethod === 'stripe' && paymentIntent) {
+      res.status(201).json({
+        success: true,
+        order: result,
+        paymentIntent: {
+          id: paymentIntent.id,
+          clientSecret: paymentIntent.client_secret,
+          amount: paymentIntent.amount,
+          currency: paymentIntent.currency,
+          status: paymentIntent.status
+        }
+      });
+    } else {
+      res.status(201).json(result);
+    }
   })
 
   /**
