@@ -16,25 +16,42 @@ const CAPTCHA = forwardRef(({ onVerify, action = 'order', children }, ref) => {
 
       const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
       
-      const token = await new Promise((resolve, reject) => {
-        window.grecaptcha.ready(() => {
-          window.grecaptcha.execute(siteKey, { action })
-            .then(resolve)
-            .catch(reject);
-        });
-      });
+      // Add timeout to prevent hanging
+      const token = await Promise.race([
+        new Promise((resolve, reject) => {
+          try {
+            window.grecaptcha.ready(() => {
+              window.grecaptcha.execute(siteKey, { action })
+                .then(resolve)
+                .catch(reject);
+            });
+          } catch (error) {
+            reject(error);
+          }
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('CAPTCHA verification timeout')), 10000)
+        )
+      ]);
+
+      // Validate token before calling onVerify
+      if (!token || typeof token !== 'string') {
+        throw new Error('Invalid CAPTCHA token received');
+      }
 
       console.log('✅ reCAPTCHA token generated for action:', action);
       onVerify(token);
       
     } catch (error) {
       console.error('❌ reCAPTCHA execution failed:', error);
+      
       // For development/testing, provide a mock token
       if (process.env.NODE_ENV === 'development') {
         console.log('🔄 Using mock CAPTCHA token for development');
         onVerify('mock_recaptcha_token_dev');
       } else {
-        throw error;
+        // In production, call onVerify with null to indicate failure
+        onVerify(null);
       }
     }
   };

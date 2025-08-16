@@ -32,6 +32,7 @@ export default function CheckoutPage() {
   // CAPTCHA state for guest orders
   const [captchaToken, setCaptchaToken] = useState(null)
   const [captchaVerified, setCaptchaVerified] = useState(false)
+  const [captchaLoading, setCaptchaLoading] = useState(false)
   const captchaRef = useRef(null)
 
   // Address management state
@@ -179,9 +180,35 @@ export default function CheckoutPage() {
 
   // CAPTCHA verification for guest orders
   const handleCaptchaVerify = (token) => {
-    console.log('✅ CAPTCHA verified with token:', token.substring(0, 20) + '...')
-    setCaptchaToken(token)
-    setCaptchaVerified(true)
+    try {
+      // Validate token
+      if (!token || typeof token !== 'string') {
+        console.error('❌ Invalid CAPTCHA token received:', token);
+        setErrors(prev => ({ ...prev, captcha: 'Error en la verificación CAPTCHA. Inténtalo de nuevo.' }));
+        setCaptchaLoading(false);
+        return;
+      }
+
+      // Log successful verification
+      console.log('✅ CAPTCHA verified with token:', token.substring(0, 20) + '...');
+      
+      // Update state
+      setCaptchaToken(token);
+      setCaptchaVerified(true);
+      setCaptchaLoading(false);
+      
+      // Clear any previous CAPTCHA errors
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.captcha;
+        return newErrors;
+      });
+      
+    } catch (error) {
+      console.error('❌ CAPTCHA verification error:', error);
+      setErrors(prev => ({ ...prev, captcha: 'Error en la verificación CAPTCHA. Inténtalo de nuevo.' }));
+      setCaptchaLoading(false);
+    }
   }
 
   // Save new address
@@ -818,13 +845,31 @@ export default function CheckoutPage() {
                           <button
                             type="button"
                             onClick={() => {
+                              setCaptchaLoading(true);
+                              setErrors(prev => {
+                                const newErrors = { ...prev };
+                                delete newErrors.captcha;
+                                return newErrors;
+                              });
+                              
                               if (captchaRef.current?.execute) {
                                 captchaRef.current.execute();
+                              } else {
+                                setCaptchaLoading(false);
+                                setErrors(prev => ({ ...prev, captcha: 'Error: CAPTCHA no disponible. Recarga la página.' }));
                               }
                             }}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+                            disabled={captchaLoading}
+                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
                           >
-                            🔒 Verificar CAPTCHA
+                            {captchaLoading ? (
+                              <div className="flex items-center justify-center gap-2">
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                Verificando...
+                              </div>
+                            ) : (
+                              '🔒 Verificar CAPTCHA'
+                            )}
                           </button>
                         </CAPTCHA>
                         {errors.captcha && (
