@@ -9,6 +9,9 @@ const jwt = require('jsonwebtoken');
 const { errorHandler } = require('./utils/errors');
 const { TableService } = require('./modules/TableService');
 const { EmailService } = require('./modules/EmailService');
+const { CAPTCHAService } = require('./modules/CAPTCHAService');
+const { RateLimitService } = require('./modules/RateLimitService');
+const { ValidationService } = require('./modules/ValidationService');
 
 const app = express();
 const port = 3001;
@@ -28,6 +31,9 @@ const pool = new Pool({
 // Initialize services
 const tableService = new TableService(pool);
 const emailService = new EmailService();
+const captchaService = new CAPTCHAService(); // Re-enabled CAPTCHA service
+const rateLimitService = new RateLimitService();
+const validationService = new ValidationService();
 
 // Middleware
 app.use(cors({
@@ -41,12 +47,51 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to OrderFlow Pizza API! 🍕' });
 });
 
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
   });
 });
+
+// Development endpoint to clear rate limits (ONLY in development!)
+if (process.env.NODE_ENV === 'development') {
+  app.post('/api/dev/clear-rate-limits', (req, res) => {
+    try {
+      const { ip } = req.body;
+      
+      if (ip) {
+        // Clear rate limits for specific IP
+        const cleared = rateLimitService.clearIPLimits(ip);
+        if (cleared) {
+          res.json({ 
+            success: true, 
+            message: `Rate limits cleared for IP: ${ip}`,
+            warning: 'This endpoint is for development only!'
+          });
+        } else {
+          res.status(400).json({ error: 'Failed to clear rate limits' });
+        }
+      } else {
+        // Clear all rate limits
+        const cleared = rateLimitService.clearAllLimits();
+        if (cleared) {
+          res.json({ 
+            success: true, 
+            message: 'All rate limits cleared',
+            warning: 'This endpoint is for development only!'
+          });
+        } else {
+          res.status(400).json({ error: 'Failed to clear rate limits' });
+        }
+      }
+    } catch (error) {
+      console.error('Error clearing rate limits:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+}
 
 // Authentication Routes
 
@@ -485,10 +530,81 @@ app.post('/api/reservations', async (req, res) => {
       reservationTime, 
       numberOfGuests, 
       specialRequests,
-      userId = null
+      userId = null,
+      recaptchaToken // For guest reservations
     } = req.body
 
-    // Validation
+    // SECURITY VALIDATION FOR GUEST RESERVATIONS
+    if (!userId) {
+      console.log('🔒 Guest reservation detected - applying security measures...')
+
+      // 1. CAPTCHA Verification for guest reservations
+      if (!recaptchaToken) {
+        return res.status(400).json({ error: 'CAPTCHA verification required for guest reservations' })
+      }
+
+      // Development mode: Use mock token for testing
+      if (process.env.NODE_ENV === 'development' && recaptchaToken === 'mock_recaptcha_token_dev') {
+        console.log('🔄 Development mode: Using mock CAPTCHA token for testing')
+        // Skip CAPTCHA verification in development with mock token
+      } else {
+        const captchaResult = await captchaService.performSecurityCheck({
+          recaptchaToken,
+          action: 'reservation',
+          ip: req.ip || req.connection.remoteAddress,
+          userAgent: req.get('User-Agent'),
+          referrer: req.get('Referrer'),
+          timestamp: Date.now()
+        })
+
+        if (!captchaResult.allowed) {
+          console.log('🚫 Guest reservation blocked by CAPTCHA:', captchaResult.overallRisk)
+          return res.status(400).json({ error: `Reservation blocked: ${captchaResult.recommendations.join(', ')}` })
+        }
+      }
+
+      // 2. Rate Limiting for guest reservations
+      const rateLimitResult = rateLimitService.checkReservationRateLimit({
+        ip: req.ip || req.connection.remoteAddress,
+        userId: null,
+        email: customerEmail,
+        phone: customerPhone
+      })
+
+      if (!rateLimitResult.allowed) {
+        console.log('🚫 Guest reservation blocked by rate limiting:', rateLimitResult.reason)
+        return res.status(429).json({ error: `Reservation blocked: ${rateLimitResult.reason}` })
+      }
+
+      // 3. Enhanced Input Validation for guest reservations
+      const reservationDataForValidation = {
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
+        reservation_date: reservationDate,
+        reservation_time: reservationTime,
+        number_of_guests: numberOfGuests
+      }
+
+      const validationResult = validationService.validateReservationData(reservationDataForValidation)
+      if (!validationResult.isValid) {
+        console.log('🚫 Guest reservation blocked by validation:', validationResult.errors)
+        return res.status(400).json({ error: `Validation failed: ${validationResult.errors.join(', ')}` })
+      }
+
+      console.log('✅ Guest reservation passed all security checks')
+
+      // Record the request for rate limiting
+      rateLimitService.recordRequest(
+        req.ip || req.connection.remoteAddress,
+        null,
+        customerEmail,
+        customerPhone,
+        'reservation'
+      )
+    }
+
+    // Basic validation (existing code)
     if (!customerName || !customerEmail || !customerPhone || !reservationDate || !reservationTime || !numberOfGuests) {
       return res.status(400).json({ error: 'Todos los campos requeridos deben estar completos' })
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
+import CAPTCHA from './CAPTCHA'
 
 // Animation variants for framer-motion style animations
 const stepAnimations = {
@@ -11,6 +12,10 @@ const stepAnimations = {
 
 export default function ReservationSystem({ isModal = false, onClose = null }) {
   const { isAuthenticated, user } = useAuth()
+  
+  const [currentStep, setCurrentStep] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState(null)
   const [formData, setFormData] = useState({
     date: '',
     time: '',
@@ -21,7 +26,6 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
     specialRequests: ''
   })
   const [availableSlots, setAvailableSlots] = useState([])
-  const [loading, setLoading] = useState(false)
   const [step, setStep] = useState(1) // 1: DateTime, 2: Details, 3: Confirmation
   const [animationKey, setAnimationKey] = useState(0) // For triggering animations
 
@@ -103,10 +107,15 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    if (!isAuthenticated && !captchaToken) {
+      alert('Por favor, completa la verificación CAPTCHA antes de continuar.')
+      return
+    }
+    
     setLoading(true)
     
     try {
-      // Prepare reservation data for backend
       const reservationData = {
         customerName: formData.name,
         customerEmail: formData.email,
@@ -115,7 +124,8 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
         reservationTime: formData.time + ':00', // Convert to HH:MM:SS format
         numberOfGuests: parseInt(formData.guests),
         specialRequests: formData.specialRequests || null,
-        userId: user?.id || null // If user is authenticated
+        userId: user?.id || null, // If user is authenticated
+        recaptchaToken: !isAuthenticated ? captchaToken : undefined // Include CAPTCHA token for guests
       }
 
       console.log('Sending reservation data:', reservationData)
@@ -530,6 +540,23 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
             Te enviaremos un recordatorio 24 horas antes de tu visita.
           </p>
         </div>
+
+        {/* CAPTCHA for guest users */}
+        {!isAuthenticated && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-blue-800 mb-2">
+              Verificación de Seguridad
+            </h3>
+            <p className="text-blue-700 mb-4">
+              Completa la verificación CAPTCHA para continuar
+            </p>
+            <CAPTCHA
+              action="reservation"
+              onVerify={setCaptchaToken}
+              className="w-full"
+            />
+          </div>
+        )}
 
         <div className="flex justify-between">
           <button

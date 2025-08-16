@@ -378,7 +378,7 @@ export default function CheckoutPage() {
         deliveryAddress: formData.deliveryAddress,
         paymentMethod: formData.paymentMethod,
         specialInstructions: formData.specialInstructions,
-        captchaToken: captchaToken, // Add captchaToken to order data
+        recaptchaToken: captchaToken, // Add captchaToken to order data
         items: items.map(item => ({
           productId: item.product_id,
           quantity: item.quantity,
@@ -848,37 +848,12 @@ export default function CheckoutPage() {
                     
                     {!captchaVerified ? (
                       <div className="space-y-3">
-                        <CAPTCHA ref={captchaRef} onVerify={handleCaptchaVerify} onTimeout={handleCaptchaTimeout} action="order">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCaptchaLoading(true);
-                              setErrors(prev => {
-                                const newErrors = { ...prev };
-                                delete newErrors.captcha;
-                                return newErrors;
-                              });
-                              
-                              if (captchaRef.current?.execute) {
-                                captchaRef.current.execute();
-                              } else {
-                                setCaptchaLoading(false);
-                                setErrors(prev => ({ ...prev, captcha: 'Error: CAPTCHA no disponible. Recarga la página.' }));
-                              }
-                            }}
-                            disabled={captchaLoading}
-                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
-                          >
-                            {captchaLoading ? (
-                              <div className="flex items-center justify-center gap-2">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                Verificando...
-                              </div>
-                            ) : (
-                              '🔒 Verificar CAPTCHA'
-                            )}
-                          </button>
-                        </CAPTCHA>
+                        <CAPTCHA 
+                          ref={captchaRef} 
+                          onVerify={handleCaptchaVerify} 
+                          onTimeout={handleCaptchaTimeout} 
+                          action="order"
+                        />
                         {errors.captcha && (
                           <p className="text-red-500 text-sm">{errors.captcha}</p>
                         )}

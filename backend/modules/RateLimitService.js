@@ -13,37 +13,37 @@ class RateLimitService {
         
         // Configuration for different rate limits
         this.limits = {
-            // IP-based limits
+            // IP-based limits - TEMPORARILY INCREASED FOR DEVELOPMENT
             ip: {
-                ordersPerHour: 3,
-                ordersPerDay: 10,
-                reservationsPerHour: 2,
-                reservationsPerDay: 5
+                ordersPerHour: 20,        // Was 3, now 20
+                ordersPerDay: 50,         // Was 10, now 50
+                reservationsPerHour: 15,   // Was 2, now 15
+                reservationsPerDay: 30    // Was 5, now 30
             },
-            // User-based limits
+            // User-based limits - TEMPORARILY INCREASED FOR DEVELOPMENT
             user: {
-                ordersPerDay: 2,
-                ordersPerWeek: 5,
-                reservationsPerDay: 1,
-                reservationsPerWeek: 2
+                ordersPerDay: 10,         // Was 2, now 10
+                ordersPerWeek: 25,        // Was 5, now 25
+                reservationsPerDay: 8,    // Was 1, now 8
+                reservationsPerWeek: 20   // Was 2, now 20
             },
-            // Email-based limits (for guest orders)
+            // Email-based limits (for guest orders) - TEMPORARILY INCREASED FOR DEVELOPMENT
             email: {
-                ordersPerDay: 2,
-                ordersPerWeek: 5
+                ordersPerDay: 10,         // Was 2, now 10
+                ordersPerWeek: 25         // Was 5, now 25
             },
-            // Phone-based limits (for guest orders)
+            // Phone-based limits (for guest orders) - TEMPORARILY INCREASED FOR DEVELOPMENT
             phone: {
-                ordersPerDay: 2,
-                ordersPerWeek: 5
+                ordersPerDay: 10,         // Was 2, now 10
+                ordersPerWeek: 25         // Was 5, now 25
             }
         };
 
-        // Cooldown periods (in milliseconds)
+        // Cooldown periods (in milliseconds) - TEMPORARILY REDUCED FOR DEVELOPMENT
         this.cooldowns = {
-            order: 5 * 60 * 1000,      // 5 minutes between orders
-            reservation: 10 * 60 * 1000, // 10 minutes between reservations
-            violation: 15 * 60 * 1000   // 15 minutes after violation
+            order: 30 * 1000,           // Was 5 minutes, now 30 seconds
+            reservation: 60 * 1000,      // Was 10 minutes, now 1 minute
+            violation: 2 * 60 * 1000    // Was 15 minutes, now 2 minutes
         };
 
         // Cleanup interval (clean old entries every hour)
@@ -60,6 +60,16 @@ class RateLimitService {
      */
     checkIPLimit(ip, action) {
         try {
+            // Development mode: Allow all requests
+            if (process.env.NODE_ENV === 'development') {
+                console.log('🔄 Development mode: Bypassing IP rate limits for testing');
+                return {
+                    allowed: true,
+                    reason: 'Development mode - rate limits bypassed',
+                    retryAfter: null
+                };
+            }
+
             if (!ip || !action) {
                 return {
                     allowed: false,
@@ -132,12 +142,22 @@ class RateLimitService {
 
     /**
      * Check if a user is allowed to make a request
-     * @param {string} userId - User ID
+     * @param {number} userId - User ID
      * @param {string} action - Action type ('order' or 'reservation')
      * @returns {Object} Rate limit check result
      */
     checkUserLimit(userId, action) {
         try {
+            // Development mode: Allow all requests
+            if (process.env.NODE_ENV === 'development') {
+                console.log('🔄 Development mode: Bypassing user rate limits for testing');
+                return {
+                    allowed: true,
+                    reason: 'Development mode - rate limits bypassed',
+                    retryAfter: null
+                };
+            }
+
             if (!userId || !action) {
                 return {
                     allowed: false,
@@ -193,13 +213,23 @@ class RateLimitService {
     }
 
     /**
-     * Check if an email is allowed to make a request (for guest orders)
+     * Check if an email is allowed to make a request
      * @param {string} email - Email address
      * @param {string} action - Action type ('order' or 'reservation')
      * @returns {Object} Rate limit check result
      */
     checkEmailLimit(email, action) {
         try {
+            // Development mode: Allow all requests
+            if (process.env.NODE_ENV === 'development') {
+                console.log('🔄 Development mode: Bypassing email rate limits for testing');
+                return {
+                    allowed: true,
+                    reason: 'Development mode - rate limits bypassed',
+                    retryAfter: null
+                };
+            }
+
             if (!email || !action) {
                 return {
                     allowed: false,
@@ -262,6 +292,16 @@ class RateLimitService {
      */
     checkPhoneLimit(phone, action) {
         try {
+            // Development mode: Allow all requests
+            if (process.env.NODE_ENV === 'development') {
+                console.log('🔄 Development mode: Bypassing phone rate limits for testing');
+                return {
+                    allowed: true,
+                    reason: 'Development mode - rate limits bypassed',
+                    retryAfter: null
+                };
+            }
+
             if (!phone || !action) {
                 return {
                     allowed: false,
@@ -494,6 +534,39 @@ class RateLimitService {
             console.error('Reservation rate limit check error:', error);
             return { allowed: true, reason: null, retryAfter: null, type: null }; // Allow on error
         }
+    }
+
+    /**
+     * Clear all rate limits (for development/testing only)
+     * WARNING: This should NOT be used in production!
+     */
+    clearAllLimits() {
+        if (process.env.NODE_ENV === 'production') {
+            console.warn('🚨 Attempted to clear rate limits in production - blocked for security');
+            return false;
+        }
+        
+        console.log('🧪 Development mode: Clearing all rate limits for testing');
+        this.ipLimits.clear();
+        this.userLimits.clear();
+        this.emailLimits.clear();
+        this.phoneLimits.clear();
+        return true;
+    }
+
+    /**
+     * Clear rate limits for a specific IP (for development/testing only)
+     * WARNING: This should NOT be used in production!
+     */
+    clearIPLimits(ip) {
+        if (process.env.NODE_ENV === 'production') {
+            console.warn('🚨 Attempted to clear IP rate limits in production - blocked for security');
+            return false;
+        }
+        
+        console.log(`🧪 Development mode: Clearing rate limits for IP: ${ip}`);
+        this.ipLimits.delete(ip);
+        return true;
     }
 
     /**
