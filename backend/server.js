@@ -1371,6 +1371,7 @@ const appModule = new AppModule(pool)
 
 // Order routes using the new controller
 app.post('/api/orders', appModule.getController('orderController').createOrder)
+app.get('/api/orders', appModule.getController('orderController').getOrdersByEmail) // New endpoint for email-based lookup
 app.get('/api/orders/:orderNumber', appModule.getController('orderController').getOrderByNumber)
 app.put('/api/orders/:orderId/status', appModule.getController('orderController').updateOrderStatus)
 app.get('/api/users/:userId/orders', appModule.getController('orderController').getUserOrders)

@@ -290,7 +290,10 @@ export const api = {
     getByNumber: (orderNumber) => apiClient.get(`/api/orders/${orderNumber}`),
     getUserOrders: (userId, email) => {
       if (userId) {
-        return apiClient.get(`/api/users/${userId}/orders`)
+        return apiClient.get(`/api/users/${userId}/orders`, {
+          headers: apiClient.getAuthHeaders(),
+          cache: false // Don't cache orders
+        })
       }
       // Fallback for email-based lookup if needed
       if (email) {

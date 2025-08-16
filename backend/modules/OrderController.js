@@ -330,6 +330,27 @@ class OrderController {
   })
 
   /**
+   * Get orders by email (for guest orders)
+   */
+  getOrdersByEmail = asyncHandler(async (req, res) => {
+    const { email } = req.query
+
+    if (!email) {
+      throw new ValidationError('Email parameter is required')
+    }
+
+    const orders = await this.orderService.getOrdersByEmail(email)
+
+    res.json({
+      success: true,
+      orders,
+      pagination: {
+        total: orders.length
+      }
+    })
+  })
+
+  /**
    * Get user orders
    */
   getUserOrders = asyncHandler(async (req, res) => {
