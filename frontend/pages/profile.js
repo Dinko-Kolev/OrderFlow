@@ -36,36 +36,41 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchOrders = async () => {
       if (!user?.id) {
-        console.log('No user ID available')
         return
       }
 
       try {
         setOrdersLoading(true)
-        console.log('Fetching orders for user:', user.id)
-        console.log('User object:', user)
         
-        const response = await api.orders.getUserOrders(user.id)
-        console.log('Orders API response:', response)
+        // Try to get orders by user ID first
+        let response = await api.orders.getUserOrders(user.id)
         
-        // Normalize response shapes:
-        // Backend returns { success:true, orders:[...], pagination:{} }
-        // apiClient wraps as { success:true, data:{ success:true, orders:[...], ... } }
         let ordersArray = []
-        if (response?.success) {
-          const payload = response.data || response
-          if (Array.isArray(payload?.orders)) {
-            ordersArray = payload.orders
-          } else if (Array.isArray(payload)) {
-            ordersArray = payload
-          } else if (Array.isArray(payload?.data)) {
-            ordersArray = payload.data
-          }
+        if (response?.success && response?.data?.orders) {
+          ordersArray = response.data.orders
+        } else if (response?.success && Array.isArray(response?.orders)) {
+          ordersArray = response.orders
         } else if (Array.isArray(response)) {
           ordersArray = response
         }
         
-        console.log('Processed orders array:', ordersArray)
+        // If no orders found by user ID, try by email (for guest orders)
+        if (ordersArray.length === 0 && user.email) {
+          try {
+            const emailResponse = await api.orders.getUserOrders(null, user.email)
+            
+            if (emailResponse?.success && emailResponse?.data?.orders) {
+              ordersArray = emailResponse.data.orders
+            } else if (emailResponse?.success && Array.isArray(emailResponse?.orders)) {
+              ordersArray = emailResponse.orders
+            } else if (Array.isArray(emailResponse)) {
+              ordersArray = emailResponse
+            }
+          } catch (emailError) {
+            // Silently handle email lookup errors
+          }
+        }
+        
         setUserOrders(ordersArray)
       } catch (error) {
         console.error('Error fetching orders:', error)
@@ -77,10 +82,8 @@ export default function ProfilePage() {
 
     if (isAuthenticated && user?.id) {
       fetchOrders()
-    } else {
-      console.log('Not authenticated or no user ID:', { isAuthenticated, userId: user?.id })
     }
-  }, [isAuthenticated, user?.id])
+  }, [isAuthenticated, user?.id, user?.email])
 
   // Prefill edit form when user loads
   useEffect(() => {
@@ -364,19 +367,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Acciones Rápidas</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <Link href="/menu" className="bg-primary hover:bg-primary/90 text-white py-3 px-6 rounded-lg font-semibold text-center transition-colors">
-                  🍕 Hacer Pedido
-                </Link>
-                <Link href="/order" className="bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-semibold text-center transition-colors">
-                  📋 Ver Mis Pedidos
-                </Link>
-              </div>
-            </div>
-
             {/* Addresses Section - Wide layout (better space) */}
             <div className="mt-8 space-y-4">
               <div className="flex items-center justify-between">
@@ -438,10 +428,6 @@ export default function ProfilePage() {
                     {ordersLoading ? '...' : userOrders.length}
                   </div>
                   <div className="text-sm text-gray-600">Pedidos Realizados</div>
-                  {/* Debug info - remove after fixing */}
-                  <div className="text-xs text-gray-400 mt-2">
-                    User ID: {user?.id || 'undefined'} | Orders: {userOrders.length}
-                  </div>
                 </div>
               </div>
             </div>
@@ -512,7 +498,7 @@ export default function ProfilePage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {Array.isArray(userOrders) && userOrders.map((order) => {
+              {Array.isArray(userOrders) && userOrders.map((order, index) => {
                 const statusInfo = getStatusInfo(order.status)
                 const StatusIcon = statusInfo.icon
                 
@@ -537,8 +523,8 @@ export default function ProfilePage() {
                         
                         <div className="text-sm text-gray-600 space-y-1">
                           <p>📅 {formatDate(order.created_at)}</p>
-                          <p>📦 {order.total_items} producto{order.total_items !== 1 ? 's' : ''}</p>
-                          <p>🚚 {order.delivery_type === 'delivery' ? 'Entrega a domicilio' : 'Recogida en tienda'}</p>
+                          <p>📦 {order.total_items || 'N/A'} producto{(order.total_items || 1) !== 1 ? 's' : ''}</p>
+                          <p>🚚 {order.order_type === 'delivery' ? 'Entrega a domicilio' : 'Recogida en tienda'}</p>
                           {order.minutes_remaining > 0 && (
                             <p className="text-primary font-medium">
                               ⏱️ {Math.round(order.minutes_remaining)} minutos restantes
@@ -559,7 +545,7 @@ export default function ProfilePage() {
                         
                         <Link
                           href={`/order/${order.order_number}`}
-                          className="flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-xl font-semibold hover:bg-primary/20 transition-colors"
+                          className="flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-lg font-semibold hover:bg-primary/20 transition-colors"
                         >
                           <Eye className="w-4 h-4" />
                           Ver Detalle

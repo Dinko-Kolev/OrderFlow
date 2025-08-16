@@ -348,6 +348,27 @@ class OrderService {
       throw new DatabaseError('Failed to retrieve user orders')
     }
   }
+
+  /**
+   * Get orders by email (for guest orders)
+   */
+  async getOrdersByEmail(email, limit = 50) {
+    try {
+      const result = await this.dbPool.query(
+        `SELECT * FROM orders 
+         WHERE customer_email = $1 
+         ORDER BY created_at DESC 
+         LIMIT $2`,
+        [email, limit]
+      )
+
+      return result.rows.map(row => new Order(row))
+
+    } catch (error) {
+      console.error('Error getting orders by email:', error)
+      throw new DatabaseError('Failed to retrieve orders by email')
+    }
+  }
 }
 
 module.exports = OrderService
