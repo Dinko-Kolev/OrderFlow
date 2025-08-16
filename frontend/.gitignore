@@ -1,0 +1,120 @@
+# Frontend-specific .gitignore
+# This file provides additional security for the Next.js frontend
+
+# =============================================
+# NEXT.JS SPECIFIC
+# =============================================
+
+# Next.js build output
+.next/
+out/
+dist/
+
+# Next.js cache
+.next/cache/
+.vercel/
+
+# =============================================
+# ENVIRONMENT & SECURITY
+# =============================================
+
+# Environment variables (CRITICAL - never commit these!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# API keys and secrets
+.env.production
+.env.staging
+.env.development
+.env.test
+
+# =============================================
+# DEPENDENCIES & BUILD
+# =============================================
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+build/
+dist/
+*.tsbuildinfo
+
+# =============================================
+# DEVELOPMENT & EDITOR
+# =============================================
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# =============================================
+# TESTING & COVERAGE
+# =============================================
+
+# Testing
+coverage/
+.nyc_output/
+.jest/
+
+# =============================================
+# LOGS & CACHE
+# =============================================
+
+# Logs
+logs/
+*.log
+
+# Cache
+.cache/
+.parcel-cache/
+
+# =============================================
+# TEMPORARY FILES
+# =============================================
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# =============================================
+# SENSITIVE DATA
+# =============================================
+
+# User uploads (if any)
+uploads/
+user-content/
+
+# Analytics and tracking
+analytics/
+tracking/
+
+# =============================================
+# PRODUCTION SPECIFIC
+# =============================================
+
+# Production builds
+.next/
+out/
+dist/
+
+# Deployment files
+.vercel/
+.netlify/

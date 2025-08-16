@@ -1,28 +1,8 @@
-import { useState } from 'react'
+
+
+import SimpleMap from '../components/SimpleMap'
 
 export default function ContactPage() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    subject: '',
-    message: ''
-  })
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
-  }
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    // Form submission logic would go here
-    console.log('Form submitted:', formData)
-    alert('¡Gracias por tu mensaje! Te contactaremos pronto.')
-    setFormData({ name: '', email: '', phone: '', subject: '', message: '' })
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 pt-20">
@@ -131,113 +111,23 @@ export default function ContactPage() {
                 </div>
               </div>
             </div>
+
           </div>
 
-          {/* Contact Form */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <h2 className="text-3xl font-bold text-primary mb-6">Envíanos un Mensaje</h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                    Nombre *
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="Tu nombre"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                    Teléfono
-                  </label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="Tu teléfono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="tu@email.com"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
-                  Asunto
-                </label>
-                <select
-                  id="subject"
-                  name="subject"
-                  value={formData.subject}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  <option value="">Selecciona un asunto</option>
-                  <option value="reserva">Reserva de mesa</option>
-                  <option value="pedido">Consulta sobre pedido</option>
-                  <option value="catering">Catering y eventos</option>
-                  <option value="trabajo">Oportunidades de trabajo</option>
-                  <option value="sugerencia">Sugerencias</option>
-                  <option value="otro">Otro</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-                  Mensaje *
-                </label>
-                <textarea
-                  id="message"
-                  name="message"
-                  value={formData.message}
-                  onChange={handleChange}
-                  required
-                  rows={5}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Escribe tu mensaje aquí..."
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-primary to-red-500 text-white py-4 px-6 rounded-lg font-bold text-lg hover:from-primary/90 hover:to-red-500/90 transition-all duration-300 transform hover:scale-105 shadow-lg"
-              >
-                📨 Enviar Mensaje
-              </button>
-            </form>
-
-            <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600 text-center">
-                <strong>Tiempo de respuesta:</strong> Respondemos todos los mensajes en menos de 24 horas
-              </p>
+          {/* Right Column - Cómo Llegar */}
+          <div className="space-y-8">
+            {/* Cómo Llegar Section */}
+            <div className="bg-white rounded-2xl shadow-xl p-8">
+              <h2 className="text-3xl font-bold text-primary mb-6 text-center">📍 Cómo Llegar</h2>
+              
+              <SimpleMap 
+                address="Calle Gran Vía, 123, Madrid"
+                height="400px"
+              />
             </div>
           </div>
+
+
         </div>
 
         {/* Social Media Section */}
@@ -308,21 +198,7 @@ export default function ContactPage() {
           </div>
         </div>
 
-        {/* Map Section */}
-        <div className="mt-12 bg-white rounded-2xl shadow-xl p-8">
-          <h2 className="text-3xl font-bold text-primary mb-6 text-center">📍 Cómo Llegar</h2>
-          
-          <div className="bg-gray-100 rounded-lg h-64 flex items-center justify-center">
-            <div className="text-center text-gray-500">
-              <span className="text-4xl mb-4 block">🗺️</span>
-              <p className="text-lg font-medium">Mapa de Ubicación</p>
-              <p className="text-sm">Calle Gran Vía, 123, Madrid</p>
-              <p className="text-xs mt-2">
-                (En producción se integraría Google Maps o similar)
-              </p>
-            </div>
-          </div>
-        </div>
+
       </div>
     </div>
   )

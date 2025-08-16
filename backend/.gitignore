@@ -1,0 +1,199 @@
+# Backend-specific .gitignore
+# This file provides additional security for the Node.js backend
+
+# =============================================
+# NODE.JS SPECIFIC
+# =============================================
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# =============================================
+# ENVIRONMENT & SECURITY (CRITICAL)
+# =============================================
+
+# Environment variables (NEVER commit these!)
+.env
+.env.local
+.env.development
+.env.test
+.env.staging
+.env.production
+.env.*.local
+.env.backup
+.env.old
+
+# API keys and secrets
+secrets/
+keys/
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Database credentials
+database/credentials/
+database/secrets/
+*.db
+*.sqlite
+*.sqlite3
+
+# =============================================
+# SMTP & EMAIL CONFIGURATION
+# =============================================
+
+# Email service credentials
+email-config/
+smtp-config/
+mail-config/
+
+# =============================================
+# LOGS & MONITORING
+# =============================================
+
+# Application logs
+logs/
+*.log
+*.log.*
+app.log
+error.log
+access.log
+
+# PM2 logs
+.pm2/
+
+# =============================================
+# DATABASE & BACKUPS
+# =============================================
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+database/backups/
+database/exports/
+*.dump
+*.backup
+*.sql~
+
+# Database migrations (if you want to ignore them)
+# migrations/
+
+# =============================================
+# DEVELOPMENT & EDITOR
+# =============================================
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# =============================================
+# TESTING & COVERAGE
+# =============================================
+
+# Testing
+coverage/
+.nyc_output/
+.jest/
+test-results/
+
+# =============================================
+# CACHE & TEMPORARY FILES
+# =============================================
+
+# Cache
+.cache/
+.npm/
+.eslintcache
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# =============================================
+# PRODUCTION & DEPLOYMENT
+# =============================================
+
+# Production builds
+dist/
+build/
+
+# Deployment files
+.vercel/
+.netlify/
+deploy/
+
+# =============================================
+# MONITORING & ANALYTICS
+# =============================================
+
+# Monitoring
+monitoring/
+metrics/
+analytics/
+
+# =============================================
+# SSL & CERTIFICATES
+# =============================================
+
+# SSL certificates
+ssl/
+certs/
+*.crt
+*.cer
+*.der
+*.p7b
+*.p8
+*.p10
+*.p12
+*.pfx
+*.pem
+*.key
+*.csr
+*.srl
+
+# =============================================
+# SSH & ACCESS
+# =============================================
+
+# SSH keys
+.ssh/
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+known_hosts
+ssh_config
+
+# =============================================
+# CLOUD & EXTERNAL SERVICES
+# =============================================
+
+# Cloud credentials
+.aws/
+.azure/
+.gcp/
+credentials.json
+service-account-key.json
+cloud-config/

@@ -1,9 +1,14 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { errorHandler } = require('./utils/errors');
+const { TableService } = require('./modules/TableService');
+const { EmailService } = require('./modules/EmailService');
 
 const app = express();
 const port = 3001;
@@ -19,6 +24,10 @@ const pool = new Pool({
   password: process.env.DB_PASS || 'pizza_pass',
   database: process.env.DB_NAME || 'pizza_db',
 });
+
+// Initialize services
+const tableService = new TableService(pool);
+const emailService = new EmailService();
 
 // Middleware
 app.use(cors({
@@ -351,29 +360,56 @@ app.post('/api/reservations', async (req, res) => {
       return res.status(400).json({ error: 'No se pueden hacer reservas en fechas pasadas' })
     }
 
-    // Check availability (simple logic: max 10 reservations per time slot)
-    const existingReservations = await pool.query(
-      'SELECT COUNT(*) as count FROM table_reservations WHERE reservation_date = $1 AND reservation_time = $2 AND status = $3',
-      [reservationDate, reservationTime, 'confirmed']
+    // Find best available table for the party
+    const bestTable = await tableService.findBestAvailableTable(
+      numberOfGuests, 
+      reservationDate, 
+      reservationTime
     )
 
-    const maxReservationsPerSlot = 10
-    if (parseInt(existingReservations.rows[0].count) >= maxReservationsPerSlot) {
-      return res.status(400).json({ error: 'No hay disponibilidad para esa fecha y hora' })
+    if (!bestTable) {
+      return res.status(400).json({ 
+        error: 'No hay mesas disponibles para esa fecha, hora y número de comensales' 
+      })
     }
 
-    // Insert reservation
+    // Insert reservation with table assignment
     const result = await pool.query(
       `INSERT INTO table_reservations 
-       (user_id, customer_name, customer_email, customer_phone, reservation_date, reservation_time, number_of_guests, special_requests) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+       (user_id, customer_name, customer_email, customer_phone, reservation_date, reservation_time, number_of_guests, special_requests, table_id) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
        RETURNING *`,
-      [userId, customerName, customerEmail, customerPhone, reservationDate, reservationTime, numberOfGuests, specialRequests || null]
+      [userId, customerName, customerEmail, customerPhone, reservationDate, reservationTime, numberOfGuests, specialRequests || null, bestTable.id]
     )
 
     const reservation = result.rows[0]
 
-    console.log(`✅ New reservation created: ${customerName} for ${reservationDate} at ${reservationTime}`)
+    // Reserve the table for this time slot
+    await tableService.reserveTable(bestTable.id, reservationDate, reservationTime, reservation.id)
+
+    // Send confirmation email
+    const emailData = {
+      customerName,
+      customerEmail,
+      customerPhone,
+      reservationDate,
+      reservationTime: reservationTime.substring(0, 5), // Convert HH:MM:SS to HH:MM
+      numberOfGuests,
+      tableName: bestTable.name,
+      tableNumber: bestTable.table_number,
+      tableCapacity: bestTable.capacity,
+      specialRequests
+    }
+    
+    const emailResult = await emailService.sendReservationConfirmation(emailData)
+    
+    if (emailResult.success) {
+      console.log(`✅ Confirmation email sent to ${customerEmail}`)
+    } else {
+      console.log(`⚠️  Email service error: ${emailResult.error}`)
+    }
+
+    console.log(`✅ New reservation created: ${customerName} for ${reservationDate} at ${reservationTime} at table ${bestTable.name} (${bestTable.capacity} seats)`)
 
     res.status(201).json({
       message: 'Reserva confirmada exitosamente',
@@ -384,6 +420,10 @@ app.post('/api/reservations', async (req, res) => {
         reservationDate: reservation.reservation_date,
         reservationTime: reservation.reservation_time,
         numberOfGuests: reservation.number_of_guests,
+        tableId: bestTable.id,
+        tableName: bestTable.name,
+        tableNumber: bestTable.table_number,
+        tableCapacity: bestTable.capacity,
         status: reservation.status,
         createdAt: reservation.created_at
       }
@@ -508,39 +548,71 @@ app.get('/api/reservations/availability/:date', async (req, res) => {
       return res.status(400).json({ error: 'Formato de fecha inválido. Use YYYY-MM-DD' })
     }
 
-    // All possible time slots
-    const allSlots = [
-      '12:00:00', '12:30:00', '13:00:00', '13:30:00', '14:00:00', '14:30:00',
-      '19:00:00', '19:30:00', '20:00:00', '20:30:00', '21:00:00', '21:30:00', '22:00:00'
-    ]
-
-    // Get existing reservations for the date
-    const reservedSlots = await pool.query(
-      'SELECT reservation_time, COUNT(*) as count FROM table_reservations WHERE reservation_date = $1 AND status = $2 GROUP BY reservation_time',
-      [date, 'confirmed']
-    )
-
-    const maxReservationsPerSlot = 10
-
-    // Calculate availability for each slot
-    const availability = allSlots.map(slot => {
-      const slotTime = slot.substring(0, 5) // Convert to HH:MM format
-      const reserved = reservedSlots.rows.find(r => r.reservation_time === slot)
-      const reservedCount = reserved ? parseInt(reserved.count) : 0
-      const spotsLeft = Math.max(0, maxReservationsPerSlot - reservedCount)
-      
-      return {
-        time: slotTime,
-        available: spotsLeft > 0,
-        spotsLeft: spotsLeft,
-        totalReservations: reservedCount
-      }
-    })
-
+    // Use the new table service to get real availability
+    const availability = await tableService.getTimeSlotAvailability(date)
+    
     res.json(availability)
 
   } catch (error) {
     console.error('Error checking availability:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// Get table availability overview for a specific date
+app.get('/api/reservations/tables/:date', async (req, res) => {
+  try {
+    const { date } = req.params
+    
+    // Validate date format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: 'Formato de fecha inválido. Use YYYY-MM-DD' })
+    }
+
+    // Use the table service to get detailed table availability
+    const tableOverview = await tableService.getAvailabilityOverview(date)
+    
+    res.json(tableOverview)
+
+  } catch (error) {
+    console.error('Error getting table availability overview:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// Test email service endpoint
+app.get('/api/test-email', async (req, res) => {
+  try {
+    const testData = {
+      customerName: 'Usuario de Prueba',
+      customerEmail: 'test@example.com',
+      customerPhone: '+34 600 000 000',
+      reservationDate: '2024-12-25',
+      reservationTime: '19:00',
+      numberOfGuests: 4,
+      tableName: 'Mesa 6',
+      tableNumber: 6,
+      tableCapacity: 6,
+      specialRequests: 'Mesa cerca de la ventana, por favor'
+    }
+    
+    const result = await emailService.sendReservationConfirmation(testData)
+    
+    if (result.success) {
+      res.json({ 
+        success: true, 
+        message: 'Test email sent successfully',
+        emailResult: result
+      })
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to send test email',
+        details: result
+      })
+    }
+  } catch (error) {
+    console.error('Error testing email service:', error)
     res.status(500).json({ error: 'Error interno del servidor' })
   }
 })
@@ -551,7 +623,11 @@ app.get('/api/reservations/user', authenticateToken, async (req, res) => {
     const userId = req.user.userId
 
     const reservations = await pool.query(
-      'SELECT * FROM table_reservations WHERE user_id = $1 ORDER BY reservation_date DESC, reservation_time DESC',
+      `SELECT r.*, rt.table_number, rt.name as table_name, rt.capacity as table_capacity
+       FROM table_reservations r
+       LEFT JOIN restaurant_tables rt ON r.table_id = rt.id
+       WHERE r.user_id = $1 
+       ORDER BY r.reservation_date DESC, r.reservation_time DESC`,
       [userId]
     )
 
@@ -564,6 +640,10 @@ app.get('/api/reservations/user', authenticateToken, async (req, res) => {
       reservationTime: r.reservation_time,
       numberOfGuests: r.number_of_guests,
       specialRequests: r.special_requests,
+      tableId: r.table_id,
+      tableNumber: r.table_number,
+      tableName: r.table_name,
+      tableCapacity: r.table_capacity,
       status: r.status,
       createdAt: r.created_at
     }))

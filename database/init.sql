@@ -341,6 +341,24 @@ GROUP BY o.id, o.order_number, o.customer_name, o.customer_email, o.status, o.or
 -- TABLE RESERVATIONS SYSTEM
 -- =============================================
 
+-- =============================================
+-- RESTAURANT TABLES MANAGEMENT
+-- =============================================
+
+-- Restaurant tables with their capacities and characteristics
+CREATE TABLE IF NOT EXISTS restaurant_tables (
+    id SERIAL PRIMARY KEY,
+    table_number INTEGER UNIQUE NOT NULL,       -- Physical table number in restaurant
+    name VARCHAR(100),                          -- Optional table name/description
+    capacity INTEGER NOT NULL CHECK (capacity > 0 AND capacity <= 20), -- Max guests
+    min_party_size INTEGER DEFAULT 1,           -- Minimum party size for this table
+    is_active BOOLEAN DEFAULT true,             -- Table can be used for reservations
+    table_type VARCHAR(50) DEFAULT 'standard',  -- standard, window, outdoor, private, etc.
+    location_description TEXT,                  -- Where the table is located
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Table for storing restaurant table reservations
 CREATE TABLE IF NOT EXISTS table_reservations (
     id SERIAL PRIMARY KEY,
@@ -352,18 +370,71 @@ CREATE TABLE IF NOT EXISTS table_reservations (
     reservation_time TIME NOT NULL,              -- Reservation time
     number_of_guests INTEGER NOT NULL CHECK (number_of_guests > 0 AND number_of_guests <= 20),
     special_requests TEXT,                       -- Special requests/notes
-    table_number INTEGER,                        -- Assigned table (for future admin use)
+    table_id INTEGER REFERENCES restaurant_tables(id) NOT NULL, -- Assigned table
     status VARCHAR(20) DEFAULT 'confirmed' CHECK (status IN ('confirmed', 'cancelled', 'completed', 'no_show')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Table availability tracking for specific dates/times
+CREATE TABLE IF NOT EXISTS table_availability (
+    id SERIAL PRIMARY KEY,
+    table_id INTEGER REFERENCES restaurant_tables(id) ON DELETE CASCADE,
+    reservation_date DATE NOT NULL,
+    reservation_time TIME NOT NULL,
+    is_available BOOLEAN DEFAULT true,          -- true = available, false = reserved
+    reservation_id INTEGER REFERENCES table_reservations(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(table_id, reservation_date, reservation_time)
+);
+
+-- Indexes for restaurant tables
+CREATE INDEX IF NOT EXISTS idx_restaurant_tables_active ON restaurant_tables(is_active);
+CREATE INDEX IF NOT EXISTS idx_restaurant_tables_capacity ON restaurant_tables(capacity);
+CREATE INDEX IF NOT EXISTS idx_restaurant_tables_type ON restaurant_tables(table_type);
+
+-- Indexes for table availability
+CREATE INDEX IF NOT EXISTS idx_table_availability_date_time ON table_availability(reservation_date, reservation_time);
+CREATE INDEX IF NOT EXISTS idx_table_availability_table ON table_availability(table_id);
+CREATE INDEX IF NOT EXISTS idx_table_availability_available ON table_availability(is_available);
 
 -- Indexes for performance (important for future admin dashboard queries)
 CREATE INDEX IF NOT EXISTS idx_reservations_date_time ON table_reservations(reservation_date, reservation_time);
 CREATE INDEX IF NOT EXISTS idx_reservations_status ON table_reservations(status);
 CREATE INDEX IF NOT EXISTS idx_reservations_user ON table_reservations(user_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_email ON table_reservations(customer_email);
+CREATE INDEX IF NOT EXISTS idx_reservations_table ON table_reservations(table_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_created ON table_reservations(created_at DESC);
+
+-- Sample restaurant tables data
+INSERT INTO restaurant_tables (table_number, name, capacity, min_party_size, table_type, location_description) VALUES
+-- Small tables (2-4 people)
+(1, 'Mesa 1', 2, 1, 'standard', 'Cerca de la entrada'),
+(2, 'Mesa 2', 2, 1, 'standard', 'Cerca de la entrada'),
+(3, 'Mesa 3', 4, 2, 'standard', 'Zona central'),
+(4, 'Mesa 4', 4, 2, 'standard', 'Zona central'),
+(5, 'Mesa 5', 4, 2, 'window', 'Ventana con vista a la calle'),
+
+-- Medium tables (6-8 people)
+(6, 'Mesa 6', 6, 4, 'standard', 'Zona central'),
+(7, 'Mesa 7', 6, 4, 'standard', 'Zona central'),
+(8, 'Mesa 8', 8, 6, 'standard', 'Zona trasera'),
+(9, 'Mesa 9', 8, 6, 'window', 'Ventana con vista al jardín'),
+
+-- Large tables (10+ people)
+(10, 'Mesa 10', 10, 8, 'standard', 'Zona trasera'),
+(11, 'Mesa 11', 12, 10, 'standard', 'Zona trasera'),
+(12, 'Mesa 12', 15, 12, 'private', 'Sala privada'),
+(13, 'Mesa 13', 20, 15, 'private', 'Sala privada para eventos');
+
+-- Sample users for testing
+INSERT INTO users (email, phone, first_name, last_name, password_hash) VALUES
+('john.doe@example.com', '+1234567890', 'John', 'Doe', 'test_hash_123'),
+('jane.smith@example.com', '+1234567891', 'Jane', 'Smith', 'test_hash_456'),
+('mike.wilson@example.com', '+1234567892', 'Mike', 'Wilson', 'test_hash_789'),
+('sarah.jones@example.com', '+1234567893', 'Sarah', 'Jones', 'test_hash_012'),
+('david.brown@example.com', '+1234567894', 'David', 'Brown', 'test_hash_345');
 
 -- View for admin dashboard (future use)
 CREATE OR REPLACE VIEW reservation_summary AS
@@ -376,7 +447,9 @@ SELECT
     r.reservation_time,
     r.number_of_guests,
     r.special_requests,
-    r.table_number,
+    rt.table_number,
+    rt.name as table_name,
+    rt.capacity as table_capacity,
     r.status,
     r.created_at,
     CASE 
@@ -386,6 +459,7 @@ SELECT
     u.email as registered_user_email
 FROM table_reservations r
 LEFT JOIN users u ON r.user_id = u.id
+LEFT JOIN restaurant_tables rt ON r.table_id = rt.id
 ORDER BY r.reservation_date DESC, r.reservation_time DESC;
 
 -- =============================================

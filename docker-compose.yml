@@ -45,6 +45,12 @@ services:
       DB_PASS: pizza_pass
       DB_NAME: pizza_db
       NODE_ENV: development
+      # Email Configuration
+      SMTP_HOST: mail.kolevhosting.com
+      SMTP_PORT: 587
+      SMTP_USER: bellavistapizza@kolevhosting.com
+      SMTP_PASS: xurnam-gyqxoj-1vuznE
+      SMTP_SECURE: false
     ports:
       - "3001:3001"
     volumes:
