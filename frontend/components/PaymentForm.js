@@ -69,7 +69,7 @@ const PaymentForm = ({
       // 1. Create order and get payment intent from backend
       console.log('💰 Creating order with payment intent...');
       
-      const orderResponse = await fetch('/api/orders', {
+      const orderResponse = await fetch(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/orders', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

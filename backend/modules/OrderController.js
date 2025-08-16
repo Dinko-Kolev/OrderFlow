@@ -62,21 +62,31 @@ class OrderController {
       
       // 1. CAPTCHA Verification for guest orders
       if (!recaptchaToken) {
-        throw new ValidationError('CAPTCHA verification required for guest orders')
+        // Development mode: Allow orders without CAPTCHA for testing
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔄 Development mode: Bypassing CAPTCHA requirement for testing');
+        } else {
+          throw new ValidationError('CAPTCHA verification required for guest orders')
+        }
       }
       
-      const captchaResult = await this.captchaService.performSecurityCheck({
-        recaptchaToken,
-        action: 'order',
-        ip: req.ip || req.connection.remoteAddress,
-        userAgent: req.get('User-Agent'),
-        referrer: req.get('Referrer'),
-        timestamp: Date.now()
-      })
-      
-      if (!captchaResult.allowed) {
-        console.log('🚫 Guest order blocked by CAPTCHA:', captchaResult.overallRisk)
-        throw new ValidationError(`Order blocked: ${captchaResult.recommendations.join(', ')}`)
+      // Development mode: Skip CAPTCHA verification for testing
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Development mode: Skipping CAPTCHA verification for testing');
+      } else {
+        const captchaResult = await this.captchaService.performSecurityCheck({
+          recaptchaToken,
+          action: 'order',
+          ip: req.ip || req.connection.remoteAddress,
+          userAgent: req.get('User-Agent'),
+          referrer: req.get('Referrer'),
+          timestamp: Date.now()
+        })
+        
+        if (!captchaResult.allowed) {
+          console.log('🚫 Guest order blocked by CAPTCHA:', captchaResult.overallRisk)
+          throw new ValidationError(`Order blocked: ${captchaResult.recommendations.join(', ')}`)
+        }
       }
       
       // 2. Rate Limiting for guest orders
@@ -211,10 +221,17 @@ class OrderController {
           }
         }
 
+        // Validate minimum amount for Stripe
+        if (totalAmount < 0.50) {
+          throw new ValidationError(`Amount too small for Stripe: $${totalAmount}. Minimum is $0.50`);
+        }
+
+        console.log('💰 Creating payment intent with amount:', totalAmount);
+        
         // Create payment intent
         paymentIntent = await this.stripeService.createPaymentIntent(
           totalAmount,
-          'usd',
+          'eur', // Changed to EUR to match your pricing
           {
             orderType: 'pizza_order',
             customerEmail: customerEmail,

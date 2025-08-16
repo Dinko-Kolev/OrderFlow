@@ -42,6 +42,96 @@ app.use(cors({
   origin: 'http://localhost:3000',
   credentials: true,
 }));
+
+// Stripe Webhook Endpoint - MUST be before express.json() middleware
+app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const sig = req.headers['stripe-signature'];
+    
+    if (!sig) {
+      console.error('❌ Stripe webhook: Missing signature');
+      return res.status(400).json({ error: 'Missing signature' });
+    }
+
+    let event;
+    
+    try {
+      // Verify webhook signature
+      event = stripeService.stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error('❌ Stripe webhook signature verification failed:', err.message);
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
+    console.log('✅ Stripe webhook received:', event.type);
+
+    // Handle the event
+    switch (event.type) {
+      case 'payment_intent.succeeded':
+        const paymentIntent = event.data.object;
+        console.log('💰 Payment succeeded:', paymentIntent.id);
+        
+        // Update order payment status
+        try {
+          await pool.query(
+            'UPDATE orders SET payment_status = $1 WHERE stripe_payment_intent_id = $2',
+            ['paid', paymentIntent.id]
+          );
+          
+          // Also update payments table if it exists
+          await pool.query(
+            'UPDATE payments SET status = $1 WHERE stripe_payment_intent_id = $2',
+            ['succeeded', paymentIntent.id]
+          );
+          
+          console.log('✅ Order payment status updated to paid');
+        } catch (error) {
+          console.error('❌ Failed to update order payment status:', error);
+        }
+        break;
+
+      case 'payment_intent.payment_failed':
+        const failedPayment = event.data.object;
+        console.log('❌ Payment failed:', failedPayment.id);
+        
+        // Update order payment status
+        try {
+          await pool.query(
+            'UPDATE orders SET payment_status = $1 WHERE stripe_payment_intent_id = $2',
+            ['failed', failedPayment.id]
+          );
+          
+          // Also update payments table if it exists
+          await pool.query(
+            'UPDATE payments SET status = $1 WHERE stripe_payment_intent_id = $2',
+            ['failed', failedPayment.id]
+          );
+          
+          console.log('✅ Order payment status updated to failed');
+        } catch (error) {
+          console.error('❌ Failed to update order payment status:', error);
+        }
+        break;
+
+      case 'customer.subscription.updated':
+        console.log('📅 Customer subscription updated');
+        break;
+
+      default:
+        console.log(`ℹ️ Unhandled event type: ${event.type}`);
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('❌ Stripe webhook error:', error);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
 app.use(express.json());
 
 // Routes
@@ -1253,94 +1343,7 @@ app.delete('/api/cart', async (req, res) => {
   }
 })
 
-// Stripe Webhook Endpoint
-app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
-  try {
-    const sig = req.headers['stripe-signature'];
-    
-    if (!sig) {
-      console.error('❌ Stripe webhook: Missing signature');
-      return res.status(400).json({ error: 'Missing signature' });
-    }
 
-    let event;
-    
-    try {
-      // Verify webhook signature
-      event = stripeService.stripe.webhooks.constructEvent(
-        req.body,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET
-      );
-    } catch (err) {
-      console.error('❌ Stripe webhook signature verification failed:', err.message);
-      return res.status(400).json({ error: 'Invalid signature' });
-    }
-
-    console.log('✅ Stripe webhook received:', event.type);
-
-    // Handle the event
-    switch (event.type) {
-      case 'payment_intent.succeeded':
-        const paymentIntent = event.data.object;
-        console.log('💰 Payment succeeded:', paymentIntent.id);
-        
-        // Update order payment status
-        try {
-          await pool.query(
-            'UPDATE orders SET payment_status = $1 WHERE stripe_payment_intent_id = $2',
-            ['paid', paymentIntent.id]
-          );
-          
-          // Also update payments table if it exists
-          await pool.query(
-            'UPDATE payments SET status = $1 WHERE stripe_payment_intent_id = $2',
-            ['succeeded', paymentIntent.id]
-          );
-          
-          console.log('✅ Order payment status updated to paid');
-        } catch (error) {
-          console.error('❌ Failed to update order payment status:', error);
-        }
-        break;
-
-      case 'payment_intent.payment_failed':
-        const failedPayment = event.data.object;
-        console.log('❌ Payment failed:', failedPayment.id);
-        
-        // Update order payment status
-        try {
-          await pool.query(
-            'UPDATE orders SET payment_status = $1 WHERE stripe_payment_intent_id = $2',
-            ['failed', failedPayment.id]
-          );
-          
-          // Also update payments table if it exists
-          await pool.query(
-            'UPDATE payments SET status = $1 WHERE stripe_payment_intent_id = $2',
-            ['failed', failedPayment.id]
-          );
-          
-          console.log('✅ Order payment status updated to failed');
-        } catch (error) {
-          console.error('❌ Failed to update order payment status:', error);
-        }
-        break;
-
-      case 'customer.subscription.updated':
-        console.log('📅 Customer subscription updated');
-        break;
-
-      default:
-        console.log(`ℹ️ Unhandled event type: ${event.type}`);
-    }
-
-    res.json({ received: true });
-  } catch (error) {
-    console.error('❌ Stripe webhook error:', error);
-    res.status(500).json({ error: 'Webhook processing failed' });
-  }
-});
 
 // Add error handling middleware
 app.use(errorHandler)

@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ShoppingBag, User, MapPin, CreditCard, Clock, Check, AlertCircle } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, User, MapPin, CreditCard, Clock, Check, AlertCircle, Plus, ChevronDown } from 'lucide-react'
 import { useCart } from '../contexts/CartContext'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements } from '@stripe/react-stripe-js'
 import PaymentForm from '../components/PaymentForm'
+import CAPTCHA from '../components/CAPTCHA'
+import AddressModal from '../components/AddressModal'
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -25,14 +28,81 @@ export default function CheckoutPage() {
   
   // Form data
   const [formData, setFormData] = useState({
-    customerName: user?.name || '',
-    customerEmail: user?.email || '',
+    customerName: '',
+    customerEmail: '',
     customerPhone: '',
     deliveryType: 'delivery',
     deliveryAddress: '',
+    selectedAddressId: null,
     paymentMethod: 'card',
     specialInstructions: ''
   })
+
+  // CAPTCHA state for guest orders
+  const [captchaToken, setCaptchaToken] = useState(null)
+  const [captchaVerified, setCaptchaVerified] = useState(false)
+  const [captchaLoading, setCaptchaLoading] = useState(false)
+  const captchaRef = useRef(null)
+
+  // Address management state
+  const [addresses, setAddresses] = useState([])
+  const [addressesLoading, setAddressesLoading] = useState(false)
+  const [showAddressModal, setShowAddressModal] = useState(false)
+
+  // Default address state (from user's saved addresses)
+  const [autoFilledAddress, setAutoFilledAddress] = useState(false)
+
+  // Populate form with user data when user is available
+  useEffect(() => {
+    if (user) {
+      console.log('User data available:', user)
+      setFormData(prev => ({
+        ...prev,
+        customerName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        customerEmail: user.email || '',
+        customerPhone: user.phone || ''
+      }))
+    }
+  }, [user])
+
+  // Fetch user addresses
+  const fetchAddresses = async () => {
+    if (!user?.id) return
+    try {
+      setAddressesLoading(true)
+      const res = await api.addresses.getForUser(user.id)
+      const list = res?.data?.addresses || res?.addresses || res?.data || []
+      setAddresses(Array.isArray(list) ? list : [])
+    } catch (e) {
+      console.error('Failed to load addresses', e)
+      setAddresses([])
+    } finally {
+      setAddressesLoading(false)
+    }
+  }
+
+  // Load addresses when user is available
+  useEffect(() => {
+    if (user?.id && formData.deliveryType === 'delivery') {
+      fetchAddresses()
+    }
+  }, [user?.id, formData.deliveryType])
+
+  // Prefill default address when delivery is selected
+  useEffect(() => {
+    if (formData.deliveryType === 'delivery' && addresses.length > 0) {
+      const defaultAddr = addresses.find(a => a.is_default) || addresses[0]
+      if (defaultAddr && !formData.deliveryAddress) {
+        const formatted = `${defaultAddr.street}, ${defaultAddr.zip_code} ${defaultAddr.city}, ${defaultAddr.state}`
+        setFormData(prev => ({ 
+          ...prev, 
+          deliveryAddress: formatted,
+          selectedAddressId: defaultAddr.id
+        }))
+        setAutoFilledAddress(true)
+      }
+    }
+  }, [formData.deliveryType, addresses])
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -90,6 +160,11 @@ export default function CheckoutPage() {
       newErrors.deliveryAddress = 'La dirección de entrega es obligatoria'
     }
 
+    // CAPTCHA validation for guest orders
+    if (!user && !captchaToken) {
+      newErrors.captcha = 'Completa la verificación CAPTCHA para continuar'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -111,6 +186,25 @@ export default function CheckoutPage() {
   const handlePaymentProcessing = (isProcessing) => {
     setLoading(isProcessing);
   };
+
+  // Address management functions
+  const handleAddressSelect = (address) => {
+    const formatted = `${address.street}, ${address.zip_code} ${address.city}, ${address.state}`
+    setFormData(prev => ({ 
+      ...prev, 
+      deliveryAddress: formatted,
+      selectedAddressId: address.id
+    }))
+  }
+
+  const deleteAddress = async (id) => {
+    try {
+      await api.addresses.delete(user.id, id)
+      fetchAddresses()
+    } catch (e) {
+      console.error('Failed to delete address', e)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -272,26 +366,130 @@ export default function CheckoutPage() {
                 </div>
 
                 {formData.deliveryType === 'delivery' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Dirección de Entrega *
-                    </label>
-                    <textarea
-                      name="deliveryAddress"
-                      value={formData.deliveryAddress}
-                      onChange={handleInputChange}
-                      rows={3}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-colors resize-none ${
-                        errors.deliveryAddress ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Calle, número, piso, puerta, código postal, ciudad..."
-                    />
-                    {errors.deliveryAddress && (
-                      <p className="text-red-500 text-sm mt-1">{errors.deliveryAddress}</p>
-                    )}
+                  <div className="space-y-4">
+                    {/* Manual Address Input */}
+                    <div className="pt-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Dirección de Entrega *
+                      </label>
+                      <textarea
+                        name="deliveryAddress"
+                        value={formData.deliveryAddress}
+                        onChange={handleInputChange}
+                        rows={3}
+                        className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-colors resize-none ${
+                          errors.deliveryAddress ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="Calle, número, piso, puerta, código postal, ciudad..."
+                      />
+                      {errors.deliveryAddress && (
+                        <p className="text-red-500 text-sm mt-1">{errors.deliveryAddress}</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
+
+                             {/* Address Selection - Full Width Like Profile Page */}
+               {formData.deliveryType === 'delivery' && user && (
+                 <div className="bg-white rounded-2xl shadow-lg p-6">
+                   <div className="mt-8 space-y-4">
+                     <div className="flex items-center justify-between">
+                       <h3 className="text-xl font-bold text-gray-800">📍 Direcciones</h3>
+                       <button 
+                         type="button"
+                         onClick={() => setShowAddressModal(true)}
+                         disabled={addresses.length >= 4}
+                         className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
+                           addresses.length >= 4 
+                             ? 'bg-gray-300 text-gray-600 cursor-not-allowed' 
+                             : 'bg-primary text-white hover:bg-primary/90'
+                         }`}
+                       >
+                         Añadir
+                       </button>
+                     </div>
+                     
+                     {addressesLoading ? (
+                       <p className="text-gray-500">Cargando...</p>
+                     ) : addresses.length === 0 ? (
+                       <p className="text-gray-600">No tienes direcciones guardadas.</p>
+                     ) : (
+                       <div className="grid md:grid-cols-2 gap-4">
+                         {addresses.slice(0, 4).map(addr => (
+                           <div 
+                             key={addr.id} 
+                             className={`border rounded-xl p-4 flex flex-col cursor-pointer transition-all ${
+                               formData.selectedAddressId === addr.id 
+                                 ? 'border-primary bg-primary/5 ring-2 ring-primary/20' 
+                                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                             }`}
+                             onClick={() => handleAddressSelect(addr)}
+                           >
+                             <div>
+                               <div className="flex items-center justify-between">
+                                 <p className="font-semibold text-gray-900 truncate mr-2">{addr.street}</p>
+                                 {addr.is_default && (
+                                   <span className="inline-flex items-center text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 whitespace-nowrap">
+                                     Predeterminada
+                                   </span>
+                                 )}
+                               </div>
+                               <p className="mt-1 text-sm text-gray-600 break-words">{addr.city}, {addr.state} {addr.zip_code}</p>
+                             </div>
+                             <div className="flex flex-wrap gap-2 justify-end mt-3">
+                               <button 
+                                 type="button"
+                                 className="px-3 py-1 rounded-lg bg-gray-100 text-sm hover:bg-gray-200"
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   setShowAddressModal(true);
+                                   // TODO: Pass address to modal for editing
+                                 }}
+                               >
+                                 Editar
+                               </button>
+                               <button 
+                                 type="button"
+                                 className="px-3 py-1 rounded-lg bg-red-500 text-white text-sm hover:bg-red-600"
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   if (confirm('¿Estás seguro de que quieres eliminar esta dirección?')) {
+                                     deleteAddress(addr.id);
+                                   }
+                                 }}
+                               >
+                                 Eliminar
+                               </button>
+                             </div>
+                           </div>
+                         ))}
+                       </div>
+                     )}
+                     
+                     <p className="text-xs text-gray-500">Máximo 4 direcciones guardadas.</p>
+                   </div>
+                 </div>
+               )}
+
+              {/* CAPTCHA for Guest Orders */}
+              {!user && (
+                <div className="bg-white rounded-2xl shadow-lg p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                      <AlertCircle className="w-4 h-4 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900">Verificación de Seguridad</h2>
+                  </div>
+                  <p className="text-gray-600 mb-4">
+                    Completa la verificación CAPTCHA para continuar
+                  </p>
+                  <CAPTCHA
+                    onVerify={setCaptchaToken}
+                    onTimeout={() => setCaptchaToken(null)}
+                  />
+                </div>
+              )}
 
               {/* Payment Method */}
               <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -373,6 +571,13 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {errors.captcha && (
+                  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                    <p className="text-red-700">{errors.captcha}</p>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={loading}
@@ -429,6 +634,8 @@ export default function CheckoutPage() {
                         items: items.map(item => ({
                           productId: item.product_id,
                           quantity: item.quantity,
+                          unitPrice: item.base_price || item.total_price,
+                          totalPrice: item.total_price,
                           customizations: item.customizations || [],
                           specialInstructions: item.special_instructions || ''
                         }))
@@ -461,23 +668,29 @@ export default function CheckoutPage() {
 
               {/* Items */}
               <div className="space-y-4 mb-6">
-                {items.map((item) => (
+                {items.map((item) => {
+                  console.log('Cart item in checkout:', item); // Debug log
+                  return (
                   <div key={item.id} className="flex gap-3">
                     <img
-                      src={item.image_url}
-                      alt={item.product_name}
+                      src={item.product_image || item.image_url || item.image || '/placeholder-pizza.jpg'}
+                      alt={item.product_name || item.name}
                       className="w-16 h-16 object-cover rounded-lg"
+                      onError={(e) => {
+                        e.target.src = '/placeholder-pizza.jpg'
+                      }}
                     />
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 text-sm">{item.product_name}</h3>
+                      <h3 className="font-semibold text-gray-900 text-sm">{item.product_name || item.name}</h3>
                       <p className="text-xs text-gray-600">Cantidad: {item.quantity}</p>
                       {item.customizations && item.customizations.length > 0 && (
                         <p className="text-xs text-gray-500">Con personalizaciones</p>
                       )}
-                      <p className="text-sm font-bold text-primary mt-1">{formatPrice(item.total_price)}</p>
+                      <p className="text-sm font-bold text-primary mt-1">{formatPrice(item.total_price || item.price)}</p>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Pricing */}
@@ -533,23 +746,37 @@ export default function CheckoutPage() {
                   <button
                     onClick={() => {
                       clearCart();
-                      router.push('/');
+                      router.push('/menu');
                     }}
                     className="w-full bg-primary text-white py-3 px-6 rounded-xl font-semibold hover:bg-primary/90 transition-colors"
                   >
                     Volver al Menú
                   </button>
                   <button
-                    onClick={() => setStep(1)}
+                    onClick={() => {
+                      clearCart();
+                      router.push('/');
+                    }}
                     className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
                   >
-                    Hacer Otro Pedido
+                    Ir al Inicio
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* Address Modal */}
+        <AddressModal
+          isOpen={showAddressModal}
+          onClose={() => setShowAddressModal(false)}
+          userId={user?.id}
+          addresses={addresses}
+          onAddressesChange={fetchAddresses}
+          onAddressSelect={handleAddressSelect}
+          showSelectionMode={true}
+        />
       </div>
     </div>
   )
