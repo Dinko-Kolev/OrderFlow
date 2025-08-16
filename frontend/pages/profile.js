@@ -216,25 +216,22 @@ export default function ProfilePage() {
   }
 
   const handleDeleteAccount = async () => {
-    if (!confirm('¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer.')) {
-      return
-    }
-
     try {
       setDeleteAccountLoading(true)
       const result = await api.auth.deleteAccount()
       
       if (result.success) {
-        alert('Your account has been successfully deleted. You will now be logged out and redirected to the home page.');
+        // Account deleted successfully - no alert needed, just proceed
         logout()
         router.push('/')
       } else {
-        alert(result.error || 'Failed to delete account. Please try again.')
+        // Only show error if it's a server error, not user cancellation
+        console.error('Account deletion failed:', result.error)
+        setDeleteAccountLoading(false)
+        setShowDeleteAccountModal(false)
       }
     } catch (error) {
       console.error('Failed to delete account:', error)
-      alert('Connection error while deleting account. Please try again.')
-    } finally {
       setDeleteAccountLoading(false)
       setShowDeleteAccountModal(false)
     }
@@ -446,37 +443,28 @@ export default function ProfilePage() {
 
             {/* Delete Account Section */}
             <div className="bg-white rounded-2xl shadow-xl p-6 border-l-4 border-red-500">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Account Deletion</h3>
+                  <p className="text-sm text-gray-600 mt-1">Permanently remove your account</p>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Account Deletion</h3>
-                  <p className="text-sm text-gray-600 mb-4 leading-relaxed">
-                    This action will permanently remove your account and all associated data. 
-                    This process cannot be undone and will result in the loss of your profile information, 
-                    saved addresses, and order history.
-                  </p>
-                  <button
-                    onClick={() => setShowDeleteAccountModal(true)}
-                    disabled={deleteAccountLoading}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                  >
-                    {deleteAccountLoading ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Processing...
-                      </>
-                    ) : (
-                      'Delete Account'
-                    )}
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowDeleteAccountModal(true)}
+                  disabled={deleteAccountLoading}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                >
+                  {deleteAccountLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </>
+                  ) : (
+                    'Delete Account'
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -689,55 +677,16 @@ export default function ProfilePage() {
                     </svg>
                   </div>
                   <div className="ml-3">
-                    <h3 className="text-lg font-medium text-gray-900">Confirm Account Deletion</h3>
+                    <h3 className="text-lg font-medium text-gray-900">Eliminar Cuenta</h3>
                   </div>
                 </div>
               </div>
 
               {/* Content */}
               <div className="px-6 py-4">
-                <div className="mb-4">
-                  <p className="text-sm text-gray-600 mb-4">
-                    You are about to permanently delete your account. This action cannot be undone.
-                  </p>
-                  
-                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                    <h4 className="text-sm font-medium text-red-800 mb-2">The following will be permanently removed:</h4>
-                    <ul className="text-sm text-red-700 space-y-1">
-                      <li className="flex items-center">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Your user profile and account information
-                      </li>
-                      <li className="flex items-center">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        All saved delivery addresses
-                      </li>
-                      <li className="flex items-center">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Your shopping cart and preferences
-                      </li>
-                      <li className="flex items-center">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Account association with previous orders
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div className="mt-4 bg-blue-50 border border-blue-200 rounded-md p-3">
-                    <p className="text-sm text-blue-800">
-                      <strong>Note:</strong> Order history will be preserved in our system for business records, 
-                      but will no longer be associated with your account.
-                    </p>
-                  </div>
-                </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  ¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer.
+                </p>
               </div>
 
               {/* Footer */}
@@ -748,7 +697,7 @@ export default function ProfilePage() {
                     disabled={deleteAccountLoading}
                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                   >
-                    Cancel
+                    Cancelar
                   </button>
                   <button
                     onClick={handleDeleteAccount}
@@ -761,10 +710,10 @@ export default function ProfilePage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Processing...
+                        Procesando...
                       </span>
                     ) : (
-                      'Delete Account'
+                      'Eliminar Cuenta'
                     )}
                   </button>
                 </div>
