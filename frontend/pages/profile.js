@@ -221,9 +221,18 @@ export default function ProfilePage() {
       const result = await api.auth.deleteAccount()
       
       if (result.success) {
-        // Account deleted successfully - no alert needed, just proceed
+        // Account deleted successfully - force immediate logout and redirect
+        console.log('Account deleted successfully, logging out...')
+        
+        // Clear all local state immediately
+        setDeleteAccountLoading(false)
+        setShowDeleteAccountModal(false)
+        
+        // Force logout and clear all auth data
         logout()
-        router.push('/')
+        
+        // Force redirect to home page
+        window.location.href = '/'
       } else {
         // Only show error if it's a server error, not user cancellation
         console.error('Account deletion failed:', result.error)

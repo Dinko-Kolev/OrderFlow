@@ -142,6 +142,11 @@ class ApiClient {
     this.authToken = token
   }
 
+  // Clear authentication token
+  clearAuthToken() {
+    this.authToken = null
+  }
+
   // Get authenticated headers
   getAuthHeaders() {
     return this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {}
@@ -306,6 +311,7 @@ export const api = {
 
   // Utility methods
   setAuthToken: (token) => apiClient.setAuthToken(token),
+  clearAuthToken: () => apiClient.clearAuthToken(),
   clearCache: () => apiClient.clearCache()
 }
 

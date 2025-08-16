@@ -127,6 +127,8 @@ export function AuthProvider({ children }) {
     setToken(null)
     localStorage.removeItem('auth_token')
     localStorage.removeItem('user_data')
+    // Clear API client auth token
+    api.clearAuthToken()
   }
 
   const getAuthHeaders = () => {
