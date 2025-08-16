@@ -217,12 +217,19 @@ export default function ProfilePage() {
 
   const handleDeleteAccount = async () => {
     try {
+      console.log('🔄 Starting account deletion process...');
+      console.log('📡 Making API call to delete account...');
+      console.log('🔑 Auth token available:', !!token);
+      console.log('👤 User ID:', user?.id);
+      
       setDeleteAccountLoading(true)
       const result = await api.auth.deleteAccount()
       
+      console.log('📥 API response received:', result);
+      
       if (result.success) {
         // Account deleted successfully - force immediate logout and redirect
-        console.log('Account deleted successfully, logging out...')
+        console.log('✅ Account deleted successfully, logging out...');
         
         // Clear all local state immediately
         setDeleteAccountLoading(false)
@@ -235,12 +242,18 @@ export default function ProfilePage() {
         window.location.href = '/'
       } else {
         // Only show error if it's a server error, not user cancellation
-        console.error('Account deletion failed:', result.error)
+        console.error('❌ Account deletion failed:', result.error);
         setDeleteAccountLoading(false)
         setShowDeleteAccountModal(false)
       }
     } catch (error) {
-      console.error('Failed to delete account:', error)
+      console.error('💥 Exception during account deletion:', error);
+      console.error('💥 Error details:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       setDeleteAccountLoading(false)
       setShowDeleteAccountModal(false)
     }

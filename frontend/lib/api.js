@@ -131,10 +131,13 @@ class ApiClient {
 
   // DELETE request
   async delete(endpoint, options = {}) {
-    return this.request(endpoint, {
+    console.log('🗑️ DELETE request:', { endpoint, options });
+    const result = await this.request(endpoint, {
       method: 'DELETE',
       ...options
-    })
+    });
+    console.log('🗑️ DELETE response:', result);
+    return result;
   }
 
   // Add authentication token to requests

@@ -380,6 +380,10 @@ app.delete('/api/auth/account', authenticateToken, async (req, res) => {
       await client.query('DELETE FROM addresses WHERE user_id = $1', [userId]);
       console.log('Deleted addresses for user:', userId);
 
+      // Delete user's table reservations
+      await client.query('DELETE FROM table_reservations WHERE user_id = $1', [userId]);
+      console.log('Deleted table reservations for user:', userId);
+
       // Delete user's cart items and cart
       await client.query('DELETE FROM cart_items WHERE cart_id IN (SELECT id FROM shopping_carts WHERE user_id = $1)', [userId]);
       await client.query('DELETE FROM shopping_carts WHERE user_id = $1', [userId]);
