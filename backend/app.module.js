@@ -6,6 +6,7 @@ const OrderService = require('./modules/OrderService')
 const ProductService = require('./modules/ProductService')
 const OrderController = require('./modules/OrderController')
 const ProductController = require('./modules/ProductController')
+const { EmailService } = require('./modules/EmailService')
 
 /**
  * Application Module Class
@@ -26,7 +27,8 @@ class AppModule {
    */
   initializeServices() {
     // Core services
-    this.services.orderService = new OrderService(this.dbPool)
+    this.services.emailService = new EmailService()
+    this.services.orderService = new OrderService(this.dbPool, this.services.emailService)
     this.services.productService = new ProductService(this.dbPool)
     
     console.log('✅ Services initialized:', Object.keys(this.services))

@@ -7,8 +7,9 @@ const { DatabaseError, ValidationError } = require('../utils/errors')
  * Handles all business logic related to orders
  */
 class OrderService {
-  constructor(dbPool) {
+  constructor(dbPool, emailService = null) {
     this.dbPool = dbPool
+    this.emailService = emailService
   }
 
   /**
@@ -168,6 +169,52 @@ class OrderService {
 
       await client.query('COMMIT')
 
+      // Send order confirmation email if email service is available
+      if (this.emailService) {
+        try {
+          console.log('📧 Preparing to send order confirmation email...')
+          
+          // Prepare order data for email
+          const orderEmailData = {
+            ...order.toJSON(),
+            items: orderItems.map(item => ({
+              ...item.toJSON(),
+              customizations: item.customizations || []
+            }))
+          }
+          
+          console.log('📧 Order data prepared for email:', {
+            orderNumber: orderEmailData.order_number,
+            customerEmail: orderEmailData.customer_email,
+            itemsCount: orderEmailData.items.length,
+            totalAmount: orderEmailData.total_amount
+          })
+          
+          // Send confirmation email asynchronously (don't block the response)
+          this.emailService.sendOrderConfirmation(orderEmailData)
+            .then(result => {
+              if (result.success) {
+                console.log('✅ Order confirmation email sent successfully')
+                console.log(`   - Message ID: ${result.messageId}`)
+                if (result.message) {
+                  console.log(`   - Message: ${result.message}`)
+                }
+              } else {
+                console.error('❌ Failed to send order confirmation email:', result.error)
+              }
+            })
+            .catch(error => {
+              console.error('❌ Error sending order confirmation email:', error)
+            })
+        } catch (emailError) {
+          // Log email error but don't fail the order creation
+          console.error('❌ Error preparing order confirmation email:', emailError)
+          console.error('   - Order creation will continue without email notification')
+        }
+      } else {
+        console.log('⚠️  Email service not available - skipping order confirmation email')
+      }
+
       return {
         success: true,
         order: {
@@ -236,7 +283,15 @@ class OrderService {
            WHERE oit.order_item_id = $1`,
           [item.id]
         )
-        item.customizations = customizationsResult.rows
+        
+        // Transform customizations to match the expected format
+        item.customizations = customizationsResult.rows.map(custom => ({
+          topping_id: custom.topping_id,
+          topping_name: custom.topping_name,
+          quantity: custom.quantity,
+          unit_price: custom.unit_price,
+          total_price: custom.total_price
+        }))
       }
 
       return {

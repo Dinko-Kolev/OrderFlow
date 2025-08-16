@@ -585,6 +585,472 @@ class EmailService {
   }
 
   /**
+   * Send order confirmation email
+   */
+  async sendOrderConfirmation(orderData) {
+    try {
+      const emailContent = this.generateOrderEmail(orderData)
+      
+      if (this.isConfigured) {
+        // Send actual email
+        const result = await this.transporter.sendMail({
+          from: `"Bella Vista Restaurant" <${process.env.SMTP_USER}>`,
+          to: orderData.customer_email,
+          subject: '🍕 Confirmación de Pedido - Bella Vista Restaurant',
+          html: emailContent.html,
+          text: emailContent.text
+        })
+        
+        console.log('✅ Order confirmation email sent successfully')
+        return { success: true, messageId: result.messageId }
+      } else {
+        // Log email content to console (for development)
+        console.log('📧 ORDER EMAIL WOULD BE SENT (SMTP not configured):')
+        console.log('To:', orderData.customer_email)
+        console.log('Subject: 🍕 Confirmación de Pedido - Bella Vista Restaurant')
+        console.log('HTML Content:', emailContent.html)
+        console.log('Text Content:', emailContent.text)
+        
+        return { success: true, messageId: 'console-log', message: 'Order email logged to console (SMTP not configured)' }
+      }
+    } catch (error) {
+      console.error('❌ Error sending order confirmation email:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Generate HTML email content for order confirmation
+   */
+  generateOrderEmail(orderData) {
+    const { 
+      order_number,
+      customer_name, 
+      customer_email,
+      customer_phone,
+      order_type,
+      delivery_address_text,
+      delivery_instructions,
+      subtotal,
+      delivery_fee,
+      total_amount,
+      estimated_delivery_time,
+      special_instructions,
+      items = []
+    } = orderData
+
+    // Validate required fields
+    if (!order_number || !customer_name || !customer_email) {
+      throw new Error('Missing required order data for email generation')
+    }
+
+    const formattedDate = new Date().toLocaleDateString('es-ES', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    const formattedTime = new Date().toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+
+    const estimatedTime = estimated_delivery_time ? new Date(estimated_delivery_time).toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit'
+    }) : ''
+
+    // Generate items HTML
+    const itemsHtml = items.map(item => {
+      const customizationsHtml = item.customizations && item.customizations.length > 0 
+        ? `<div style="margin-left: 20px; font-size: 0.9em; color: #6b7280;">
+             ${item.customizations.map(custom => {
+               const toppingName = custom.topping_name || custom.name || `Topping #${custom.topping_id || 'N/A'}`
+               const unitPrice = custom.unit_price || custom.price || 0
+               return `• ${toppingName}: +€${unitPrice.toFixed(2)}`
+             }).join('<br>')}
+           </div>`
+        : ''
+
+      return `
+        <div style="border-bottom: 1px solid #e9ecef; padding: 10px 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <strong>${item.product_name || `Producto #${item.product_id}`}</strong>
+              <br>
+              <small style="color: #6b7280;">Cantidad: ${item.quantity} × €${(item.unit_price || 0).toFixed(2)}</small>
+              ${customizationsHtml}
+            </div>
+            <div style="font-weight: bold; color: #1f2937;">
+              €${(item.total_price || 0).toFixed(2)}
+            </div>
+          </div>
+        </div>
+      `
+    }).join('')
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Confirmación de Pedido</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+          }
+          .email-container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+          }
+          .logo {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+          }
+          .title {
+            color: #dc2626;
+            font-size: 1.8em;
+            font-weight: bold;
+            margin: 0;
+          }
+          .subtitle {
+            color: #6b7280;
+            font-size: 1.1em;
+            margin: 5px 0 0 0;
+          }
+          .confirmation-badge {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 10px 0;
+          }
+          .order-details {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+          }
+          .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+          }
+          .detail-row:last-child {
+            border-bottom: none;
+          }
+          .detail-label {
+            font-weight: 600;
+            color: #374151;
+          }
+          .detail-value {
+            color: #1f2937;
+            text-align: right;
+          }
+          .order-items {
+            background-color: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+          }
+          .order-summary {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+          }
+          .delivery-info {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6b7280;
+            font-size: 0.9em;
+          }
+          .contact-info {
+            background-color: #f3f4f6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+          }
+          .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            margin: 10px 5px;
+            transition: transform 0.2s;
+          }
+          .button:hover {
+            transform: translateY(-2px);
+          }
+          @media (max-width: 600px) {
+            .email-container {
+              padding: 20px;
+            }
+            .detail-row {
+              flex-direction: column;
+              align-items: flex-start;
+            }
+            .detail-value {
+              text-align: left;
+              margin-top: 5px;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="email-container">
+          <div class="header">
+            <div class="logo">🍕</div>
+            <h1 class="title">Bella Vista Restaurant</h1>
+            <p class="subtitle">Cocina italiana auténtica en el corazón de Madrid</p>
+            <div class="confirmation-badge">✅ PEDIDO CONFIRMADO</div>
+          </div>
+
+          <p>¡Hola <strong>${customer_name}</strong>!</p>
+          
+          <p>Tu pedido en <strong>Bella Vista Restaurant</strong> ha sido confirmado exitosamente. 
+          Estamos preparando tu comida con los ingredientes más frescos y el amor por la cocina italiana.</p>
+
+          <div class="order-details">
+            <h3 style="margin-top: 0; color: #1f2937;">📋 Detalles del Pedido</h3>
+            
+            <div class="detail-row">
+              <span class="detail-label">🔢 Número de Pedido:</span>
+              <span class="detail-value">#${order_number}</span>
+            </div>
+            
+            <div class="detail-row">
+              <span class="detail-label">📅 Fecha:</span>
+              <span class="detail-value">${formattedDate}</span>
+            </div>
+            
+            <div class="detail-row">
+              <span class="detail-label">🕒 Hora:</span>
+              <span class="detail-value">${formattedTime}</span>
+            </div>
+            
+            <div class="detail-row">
+              <span class="detail-label">📧 Email:</span>
+              <span class="detail-value">${customer_email}</span>
+            </div>
+            
+            <div class="detail-row">
+              <span class="detail-label">📱 Teléfono:</span>
+              <span class="detail-value">${customer_phone || 'No proporcionado'}</span>
+            </div>
+            
+            <div class="detail-row">
+              <span class="detail-label">🚚 Tipo de Pedido:</span>
+              <span class="detail-value">${order_type === 'delivery' ? 'Entrega a domicilio' : 'Recogida en local'}</span>
+            </div>
+          </div>
+
+          ${order_type === 'delivery' ? `
+            <div class="delivery-info">
+              <h4 style="margin: 0 0 10px 0; color: #92400e;">📍 Dirección de Entrega</h4>
+              <p style="margin: 0; color: #92400e;">
+                <strong>${delivery_address_text}</strong>
+                ${delivery_instructions ? `<br><small>Instrucciones: ${delivery_instructions}</small>` : ''}
+              </p>
+            </div>
+          ` : ''}
+
+          <div class="order-items">
+            <h3 style="margin-top: 0; color: #1f2937;">🍽️ Tu Pedido</h3>
+            ${itemsHtml}
+          </div>
+
+          <div class="order-summary">
+            <h3 style="margin: 0 0 15px 0;">💰 Resumen del Pedido</h3>
+            
+            <div style="display: flex; justify-content: space-between; margin: 8px 0;">
+              <span>Subtotal:</span>
+              <span>€${subtotal.toFixed(2)}</span>
+            </div>
+            
+            ${delivery_fee > 0 ? `
+              <div style="display: flex; justify-content: space-between; margin: 8px 0;">
+                <span>Gastos de envío:</span>
+                <span>€${delivery_fee.toFixed(2)}</span>
+              </div>
+            ` : ''}
+            
+            <div style="display: flex; justify-content: space-between; margin: 8px 0; font-weight: bold; font-size: 1.1em; border-top: 1px solid rgba(255,255,255,0.3); padding-top: 8px;">
+              <span>Total:</span>
+              <span>€${total_amount.toFixed(2)}</span>
+            </div>
+          </div>
+
+          ${estimated_delivery_time ? `
+            <div style="background-color: #f0f9ff; border-radius: 8px; padding: 15px; margin: 20px 0;">
+              <h4 style="margin: 0 0 10px 0; color: #0369a1;">⏰ Tiempo Estimado de Entrega</h4>
+              <p style="margin: 0; color: #0369a1; font-size: 1.1em;">
+                <strong>${estimatedTime}</strong> (aproximadamente ${order_type === 'delivery' ? '45 minutos' : '30 minutos'})
+              </p>
+            </div>
+          ` : ''}
+
+          ${special_instructions ? `
+            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+              <h4 style="margin: 0 0 10px 0; color: #92400e;">💬 Instrucciones Especiales</h4>
+              <p style="margin: 0; color: #92400e;">${special_instructions}</p>
+            </div>
+          ` : ''}
+
+          <div class="contact-info">
+            <h4 style="margin: 0 0 10px 0;">📞 Información de Contacto</h4>
+            <p style="margin: 5px 0;">
+              <strong>Dirección:</strong> Calle Gran Vía, 123, Madrid<br>
+              <strong>Teléfono:</strong> +34 91 123 45 67<br>
+              <strong>Email:</strong> info@bellavista.com
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="/order/${order_number}" class="button">📋 Ver Estado del Pedido</a>
+            <a href="tel:+34911234567" class="button">📞 Llamar</a>
+          </div>
+
+          <div style="background-color: #f0f9ff; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <h4 style="margin: 0 0 10px 0; color: #0369a1;">ℹ️ Información Importante</h4>
+            <ul style="margin: 0; padding-left: 20px; color: #0369a1;">
+              <li>Tu pedido está siendo preparado con ingredientes frescos</li>
+              <li>Te notificaremos cuando esté listo para ${order_type === 'delivery' ? 'entrega' : 'recogida'}</li>
+              <li>Para cambios o cancelaciones, contacta con nosotros inmediatamente</li>
+              <li>Métodos de pago aceptados: Efectivo, Tarjeta, Bizum</li>
+            </ul>
+          </div>
+
+          <p>Si tienes alguna pregunta sobre tu pedido, no dudes en contactarnos.</p>
+
+          <p>¡Gracias por elegir Bella Vista Restaurant!</p>
+
+          <p>Saludos,<br>
+          <strong>El equipo de Bella Vista Restaurant</strong></p>
+
+          <div class="footer">
+            <p>Este email fue enviado automáticamente. Por favor, no respondas a este mensaje.</p>
+            <p>© 2024 Bella Vista Restaurant. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    const text = `
+      🍕 Bella Vista Restaurant - Confirmación de Pedido
+
+      ✅ PEDIDO CONFIRMADO
+
+      Hola ${customer_name},
+
+      Tu pedido en Bella Vista Restaurant ha sido confirmado exitosamente.
+
+      📋 DETALLES DEL PEDIDO:
+      - Número de Pedido: #${order_number}
+      - Fecha: ${formattedDate}
+      - Hora: ${formattedTime}
+      - Tipo: ${order_type === 'delivery' ? 'Entrega a domicilio' : 'Recogida en local'}
+      - Email: ${customer_email}
+      - Teléfono: ${customer_phone || 'No proporcionado'}
+
+      ${order_type === 'delivery' ? `
+      📍 DIRECCIÓN DE ENTREGA:
+      ${delivery_address_text}
+      ${delivery_instructions ? `Instrucciones: ${delivery_instructions}` : ''}
+      ` : ''}
+
+      🍽️ TU PEDIDO:
+      ${items.map(item => {
+        const baseItem = `${item.product_name || `Producto #${item.product_id}`} - ${item.quantity} × €${(item.unit_price || 0).toFixed(2)} = €${(item.total_price || 0).toFixed(2)}`
+        
+        if (item.customizations && item.customizations.length > 0) {
+          const customizationsText = item.customizations.map(custom => {
+            const toppingName = custom.topping_name || custom.name || `Topping #${custom.topping_id || 'N/A'}`
+            const unitPrice = custom.unit_price || custom.price || 0
+            return `  + ${toppingName}: €${unitPrice.toFixed(2)}`
+          }).join('\n')
+          return `${baseItem}\n${customizationsText}`
+        }
+        
+        return baseItem
+      }).join('\n')}
+
+      💰 RESUMEN DEL PEDIDO:
+      - Subtotal: €${subtotal.toFixed(2)}
+      ${delivery_fee > 0 ? `- Gastos de envío: €${delivery_fee.toFixed(2)}` : ''}
+      - Total: €${total_amount.toFixed(2)}
+
+      ${estimated_delivery_time ? `
+      ⏰ TIEMPO ESTIMADO DE ENTREGA:
+      ${estimatedTime} (aproximadamente ${order_type === 'delivery' ? '45 minutos' : '30 minutos'})
+      ` : ''}
+
+      ${special_instructions ? `
+      💬 INSTRUCCIONES ESPECIALES:
+      ${special_instructions}
+      ` : ''}
+
+      📞 INFORMACIÓN DE CONTACTO:
+      - Dirección: Calle Gran Vía, 123, Madrid
+      - Teléfono: +34 91 123 45 67
+      - Email: info@bellavista.com
+
+      ℹ️ INFORMACIÓN IMPORTANTE:
+      - Tu pedido está siendo preparado con ingredientes frescos
+      - Te notificaremos cuando esté listo
+      - Para cambios o cancelaciones, contacta con nosotros inmediatamente
+      - Métodos de pago aceptados: Efectivo, Tarjeta, Bizum
+
+      Si tienes alguna pregunta, contacta con nosotros.
+
+      ¡Gracias por elegir Bella Vista Restaurant!
+
+      Saludos,
+      El equipo de Bella Vista Restaurant
+
+      © 2024 Bella Vista Restaurant
+    `
+
+    return { html, text }
+  }
+
+  /**
    * Test email service configuration
    */
   async testConnection() {
