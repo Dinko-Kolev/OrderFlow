@@ -441,108 +441,134 @@ class CAPTCHAService {
     }
 
     /**
-     * Comprehensive security check combining reCAPTCHA and bot detection
-     * @param {Object} requestData - Complete request data
-     * @returns {Promise<Object>} Security check result
+     * Perform comprehensive security check
      */
     async performSecurityCheck(requestData) {
         try {
             const {
                 recaptchaToken,
-                action,
+                action = 'default',
                 ip,
                 userAgent,
                 referrer,
                 timestamp
             } = requestData;
 
-            // Track request for behavior analysis
-            this.trackRequest(ip, {
-                userAgent,
-                referrer,
-                ip,
-                action,
-                timestamp: timestamp || Date.now()
-            });
-
-            // Get behavior analysis
-            const behaviorAnalysis = this.getBehaviorAnalysis(ip);
-
-            // Verify reCAPTCHA if token provided
-            let recaptchaResult = null;
-            if (recaptchaToken) {
-                recaptchaResult = await this.verifyRecaptcha(recaptchaToken, action);
+            // Development mode: Allow mock tokens
+            if (process.env.NODE_ENV === 'development' && recaptchaToken === 'mock_recaptcha_token_dev') {
+                console.log('🔄 Development mode: Allowing mock CAPTCHA token');
+                return {
+                    allowed: true,
+                    overallRisk: 'low',
+                    score: 0.9,
+                    recommendations: ['Mock token accepted in development mode'],
+                    details: {
+                        recaptcha: { valid: true, score: 0.9 },
+                        botDetection: { risk: 'low', score: 0.1 },
+                        ipAnalysis: { risk: 'low', score: 0.1 },
+                        behaviorAnalysis: { risk: 'low', score: 0.1 }
+                    }
+                };
             }
 
-            // Analyze request for bot behavior
-            const botAnalysis = this.analyzeRequest({
-                ip,
-                userAgent,
-                referrer,
-                timestamp: timestamp || Date.now(),
-                requestCount: behaviorAnalysis.totalRequests,
-                timeSinceLastRequest: behaviorAnalysis.averageInterval
-            });
-
-            // Combine results for final decision
-            const overallRisk = this.calculateOverallRisk(recaptchaResult, botAnalysis, behaviorAnalysis);
-            const isAllowed = this.shouldAllowRequest(overallRisk, recaptchaResult, botAnalysis);
-
+            // Production mode: Full security check
+            const recaptchaResult = await this.verifyRecaptcha(recaptchaToken, action);
+            const botDetectionResult = this.analyzeRequest(requestData);
+            
+            // Calculate overall risk score
+            const overallRisk = this.calculateOverallRisk(recaptchaResult, botDetectionResult);
+            
+            // Determine if request should be allowed
+            const allowed = overallRisk.score < 0.7; // Allow if risk score is below 0.7
+            
+            // Generate recommendations
+            const recommendations = this.generateRecommendations(overallRisk);
+            
             return {
-                allowed: isAllowed,
-                overallRisk: overallRisk,
-                recaptcha: recaptchaResult,
-                botDetection: botAnalysis,
-                behaviorAnalysis: behaviorAnalysis,
-                recommendations: this.getSecurityRecommendations(overallRisk, recaptchaResult, botAnalysis),
-                timestamp: new Date().toISOString()
+                allowed,
+                overallRisk: overallRisk.level,
+                score: overallRisk.score,
+                recommendations,
+                details: {
+                    recaptcha: recaptchaResult,
+                    botDetection: botDetectionResult
+                }
             };
+            
         } catch (error) {
-            console.error('Security check error:', error);
+            console.error('Security check failed:', error);
             return {
                 allowed: false,
-                overallRisk: 'high',
-                error: 'Security check failed',
-                reason: error.message,
-                timestamp: new Date().toISOString()
+                overallRisk: 'critical',
+                score: 1.0,
+                recommendations: ['Security check failed - block request'],
+                details: {
+                    error: error.message
+                }
             };
         }
     }
 
     /**
      * Calculate overall risk score
-     * @param {Object} recaptchaResult - reCAPTCHA verification result
-     * @param {Object} botAnalysis - Bot detection result
-     * @param {Object} behaviorAnalysis - Behavior analysis result
-     * @returns {string} Overall risk level
      */
-    calculateOverallRisk(recaptchaResult, botAnalysis, behaviorAnalysis) {
-        let riskScore = 0;
-
-        // reCAPTCHA risk
-        if (!recaptchaResult || !recaptchaResult.success) {
-            riskScore += 40;
-        } else if (recaptchaResult.isBot) {
-            riskScore += 30;
+    calculateOverallRisk(recaptchaResult, botDetectionResult) {
+        let totalScore = 0;
+        let factors = 0;
+        
+        // reCAPTCHA score (0.0 = bot, 1.0 = human)
+        if (recaptchaResult && recaptchaResult.score !== undefined) {
+            totalScore += (1 - recaptchaResult.score); // Invert score so higher = more risk
+            factors++;
+        } else {
+            totalScore += 0.8; // High risk if no CAPTCHA
+            factors++;
         }
-
-        // Bot detection risk
-        if (botAnalysis.isBot) {
-            riskScore += 35;
+        
+        // Bot detection score
+        if (botDetectionResult && botDetectionResult.riskScore !== undefined) {
+            totalScore += botDetectionResult.riskScore;
+            factors++;
+        } else {
+            totalScore += 0.5; // Medium risk if no bot detection
+            factors++;
         }
+        
+        // Calculate average risk score
+        const averageScore = factors > 0 ? totalScore / factors : 0.8;
+        
+        // Determine risk level
+        let level = 'low';
+        if (averageScore >= 0.7) level = 'high';
+        else if (averageScore >= 0.4) level = 'medium';
+        
+        return {
+            score: averageScore,
+            level: level
+        };
+    }
 
-        // Behavior risk
-        if (behaviorAnalysis.riskAssessment === 'high') {
-            riskScore += 25;
-        } else if (behaviorAnalysis.riskAssessment === 'medium') {
-            riskScore += 15;
+    /**
+     * Generate security recommendations
+     */
+    generateRecommendations(overallRisk) {
+        const recommendations = [];
+        
+        if (overallRisk.score >= 0.8) {
+            recommendations.push('Block request immediately');
+            recommendations.push('Log for security investigation');
+            recommendations.push('Consider IP ban');
+        } else if (overallRisk.score >= 0.6) {
+            recommendations.push('Require additional verification');
+            recommendations.push('Monitor for suspicious activity');
+        } else if (overallRisk.score >= 0.4) {
+            recommendations.push('Allow with caution');
+            recommendations.push('Monitor user behavior');
+        } else {
+            recommendations.push('Request appears safe');
         }
-
-        // Determine overall risk
-        if (riskScore >= 70) return 'high';
-        if (riskScore >= 50) return 'medium';
-        if (riskScore >= 30) return 'low';
-        return 'minimal';
+        
+        return recommendations;
     }
 
     /**

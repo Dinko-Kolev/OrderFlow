@@ -1,4 +1,7 @@
 const OrderService = require('./OrderService')
+const { ValidationService } = require('./ValidationService')
+const { RateLimitService } = require('./RateLimitService')
+const { CAPTCHAService } = require('./CAPTCHAService')
 const { asyncHandler, ValidationError } = require('../utils/errors')
 
 /**
@@ -8,6 +11,9 @@ const { asyncHandler, ValidationError } = require('../utils/errors')
 class OrderController {
   constructor(orderService) {
     this.orderService = orderService
+    this.validationService = new ValidationService()
+    this.rateLimitService = new RateLimitService()
+    this.captchaService = new CAPTCHAService()
   }
 
   /**
@@ -29,7 +35,8 @@ class OrderController {
       deliveryAddress,
       paymentMethod,
       specialInstructions,
-      items
+      items,
+      recaptchaToken // For guest orders
     } = req.body
 
     // Debug: Log the extracted values
@@ -43,22 +50,74 @@ class OrderController {
       deliveryAddress,
       paymentMethod,
       specialInstructions,
-      items
+      items,
+      recaptchaToken
     })
 
-    // Validate required fields with detailed logging
-    console.log('Validation check:', {
-      hasCustomerName: !!customerName,
-      hasCustomerEmail: !!customerEmail,
-      hasDeliveryType: !!deliveryType,
-      hasItems: !!items,
-      isItemsArray: Array.isArray(items),
-      customerName,
-      customerEmail,
-      deliveryType,
-      items
-    })
-    
+    // SECURITY VALIDATION FOR GUEST ORDERS
+    if (!userId) {
+      console.log('🔒 Guest order detected - applying security measures...')
+      
+      // 1. CAPTCHA Verification for guest orders
+      if (!recaptchaToken) {
+        throw new ValidationError('CAPTCHA verification required for guest orders')
+      }
+      
+      const captchaResult = await this.captchaService.performSecurityCheck({
+        recaptchaToken,
+        action: 'order',
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent'),
+        referrer: req.get('Referrer'),
+        timestamp: Date.now()
+      })
+      
+      if (!captchaResult.allowed) {
+        console.log('🚫 Guest order blocked by CAPTCHA:', captchaResult.overallRisk)
+        throw new ValidationError(`Order blocked: ${captchaResult.recommendations.join(', ')}`)
+      }
+      
+      // 2. Rate Limiting for guest orders
+      const rateLimitResult = this.rateLimitService.checkOrderRateLimit({
+        ip: req.ip || req.connection.remoteAddress,
+        userId: null,
+        email: customerEmail,
+        phone: customerPhone
+      })
+      
+      if (!rateLimitResult.allowed) {
+        console.log('🚫 Guest order blocked by rate limiting:', rateLimitResult.reason)
+        throw new ValidationError(`Order blocked: ${rateLimitResult.reason}`)
+      }
+      
+      // 3. Enhanced Input Validation for guest orders
+      const orderDataForValidation = {
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
+        order_type: deliveryType,
+        delivery_address_text: deliveryAddress
+      }
+      
+      const validationResult = this.validationService.validateOrderData(orderDataForValidation)
+      if (!validationResult.isValid) {
+        console.log('🚫 Guest order blocked by validation:', validationResult.errors)
+        throw new ValidationError(`Validation failed: ${validationResult.errors.join(', ')}`)
+      }
+      
+      console.log('✅ Guest order passed all security checks')
+      
+      // Record the request for rate limiting
+      this.rateLimitService.recordRequest(
+        req.ip || req.connection.remoteAddress,
+        null,
+        customerEmail,
+        customerPhone,
+        'order'
+      )
+    }
+
+    // Basic validation (existing logic)
     if (!customerName || !customerEmail || !deliveryType || !items || !Array.isArray(items)) {
       const missingFields = []
       if (!customerName) missingFields.push('customerName')
