@@ -38,16 +38,29 @@ export default function RegisterPage() {
   const validateForm = () => {
     const newErrors = {}
 
+    // Enhanced name validation - prevent numbers and suspicious patterns
     if (!formData.firstName.trim()) {
       newErrors.firstName = 'El nombre es requerido'
     } else if (formData.firstName.trim().length < 2) {
       newErrors.firstName = 'El nombre debe tener al menos 2 caracteres'
+    } else if (/\d/.test(formData.firstName.trim())) {
+      newErrors.firstName = 'El nombre no puede contener números'
+    } else if (!/^[a-zA-ZÀ-ÿ\s'-]+$/.test(formData.firstName.trim())) {
+      newErrors.firstName = 'El nombre solo puede contener letras, espacios, guiones y apóstrofes'
+    } else if (formData.firstName.trim().length > 50) {
+      newErrors.firstName = 'El nombre no puede exceder 50 caracteres'
     }
 
     if (!formData.lastName.trim()) {
       newErrors.lastName = 'El apellido es requerido'
     } else if (formData.lastName.trim().length < 2) {
       newErrors.lastName = 'El apellido debe tener al menos 2 caracteres'
+    } else if (/\d/.test(formData.lastName.trim())) {
+      newErrors.lastName = 'El apellido no puede contener números'
+    } else if (!/^[a-zA-ZÀ-ÿ\s'-]+$/.test(formData.lastName.trim())) {
+      newErrors.lastName = 'El apellido solo puede contener letras, espacios, guiones y apóstrofes'
+    } else if (formData.lastName.trim().length > 50) {
+      newErrors.lastName = 'El apellido no puede exceder 50 caracteres'
     }
 
     if (!formData.email) {

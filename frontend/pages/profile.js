@@ -19,6 +19,8 @@ export default function ProfilePage() {
   const [addressForm, setAddressForm] = useState({ id: null, street: '', city: '', state: '', zip_code: '', is_default: false })
   const [addressErrors, setAddressErrors] = useState({})
   const [addressModalOpen, setAddressModalOpen] = useState(false)
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false)
   const defaultAddressId = useMemo(() => {
     const def = addresses.find(a => a.is_default)
     return def ? def.id : null
@@ -211,6 +213,50 @@ export default function ProfilePage() {
   const handleLogout = () => {
     logout()
     router.push('/')
+  }
+
+  const handleDeleteAccount = async () => {
+    try {
+      console.log('🔄 Starting account deletion process...');
+      console.log('📡 Making API call to delete account...');
+      console.log('🔑 Auth token available:', !!token);
+      console.log('👤 User ID:', user?.id);
+      
+      setDeleteAccountLoading(true)
+      const result = await api.auth.deleteAccount()
+      
+      console.log('📥 API response received:', result);
+      
+      if (result.success) {
+        // Account deleted successfully - force immediate logout and redirect
+        console.log('✅ Account deleted successfully, logging out...');
+        
+        // Clear all local state immediately
+        setDeleteAccountLoading(false)
+        setShowDeleteAccountModal(false)
+        
+        // Force logout and clear all auth data
+        logout()
+        
+        // Force redirect to home page
+        window.location.href = '/'
+      } else {
+        // Only show error if it's a server error, not user cancellation
+        console.error('❌ Account deletion failed:', result.error);
+        setDeleteAccountLoading(false)
+        setShowDeleteAccountModal(false)
+      }
+    } catch (error) {
+      console.error('💥 Exception during account deletion:', error);
+      console.error('💥 Error details:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      setDeleteAccountLoading(false)
+      setShowDeleteAccountModal(false)
+    }
   }
 
   const formatPrice = (price) => {
@@ -416,6 +462,33 @@ export default function ProfilePage() {
                 🚪 Cerrar Sesión
               </button>
             </div>
+
+            {/* Delete Account Section */}
+            <div className="bg-white rounded-2xl shadow-xl p-6 border-l-4 border-red-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Account Deletion</h3>
+                  <p className="text-sm text-gray-600 mt-1">Permanently remove your account</p>
+                </div>
+                <button
+                  onClick={() => setShowDeleteAccountModal(true)}
+                  disabled={deleteAccountLoading}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                >
+                  {deleteAccountLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </>
+                  ) : (
+                    'Delete Account'
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -607,6 +680,64 @@ export default function ProfilePage() {
                       ))}
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Account Confirmation Modal */}
+        {showDeleteAccountModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-lg font-medium text-gray-900">Eliminar Cuenta</h3>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="px-6 py-4">
+                <p className="text-sm text-gray-600 mb-4">
+                  ¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer.
+                </p>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setShowDeleteAccountModal(false)}
+                    disabled={deleteAccountLoading}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleteAccountLoading}
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                  >
+                    {deleteAccountLoading ? (
+                      <span className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Procesando...
+                      </span>
+                    ) : (
+                      'Eliminar Cuenta'
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

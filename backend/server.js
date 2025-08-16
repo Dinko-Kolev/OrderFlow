@@ -9,6 +9,9 @@ const jwt = require('jsonwebtoken');
 const { errorHandler } = require('./utils/errors');
 const { TableService } = require('./modules/TableService');
 const { EmailService } = require('./modules/EmailService');
+const { CAPTCHAService } = require('./modules/CAPTCHAService');
+const { RateLimitService } = require('./modules/RateLimitService');
+const { ValidationService } = require('./modules/ValidationService');
 
 const app = express();
 const port = 3001;
@@ -28,6 +31,9 @@ const pool = new Pool({
 // Initialize services
 const tableService = new TableService(pool);
 const emailService = new EmailService();
+const captchaService = new CAPTCHAService(); // Re-enabled CAPTCHA service
+const rateLimitService = new RateLimitService();
+const validationService = new ValidationService();
 
 // Middleware
 app.use(cors({
@@ -41,12 +47,51 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to OrderFlow Pizza API! 🍕' });
 });
 
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
   });
 });
+
+// Development endpoint to clear rate limits (ONLY in development!)
+if (process.env.NODE_ENV === 'development') {
+  app.post('/api/dev/clear-rate-limits', (req, res) => {
+    try {
+      const { ip } = req.body;
+      
+      if (ip) {
+        // Clear rate limits for specific IP
+        const cleared = rateLimitService.clearIPLimits(ip);
+        if (cleared) {
+          res.json({ 
+            success: true, 
+            message: `Rate limits cleared for IP: ${ip}`,
+            warning: 'This endpoint is for development only!'
+          });
+        } else {
+          res.status(400).json({ error: 'Failed to clear rate limits' });
+        }
+      } else {
+        // Clear all rate limits
+        const cleared = rateLimitService.clearAllLimits();
+        if (cleared) {
+          res.json({ 
+            success: true, 
+            message: 'All rate limits cleared',
+            warning: 'This endpoint is for development only!'
+          });
+        } else {
+          res.status(400).json({ error: 'Failed to clear rate limits' });
+        }
+      }
+    } catch (error) {
+      console.error('Error clearing rate limits:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+}
 
 // Authentication Routes
 
@@ -55,10 +100,49 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const { firstName, lastName, email, phone, password } = req.body;
 
-    // Validation
+    // Enhanced validation
     if (!firstName || !lastName || !email || !phone || !password) {
       return res.status(400).json({ 
         error: 'Todos los campos son requeridos' 
+      });
+    }
+
+    // Enhanced name validation - prevent numbers and suspicious patterns
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]+$/;
+    
+    if (firstName.trim().length < 2 || firstName.trim().length > 50) {
+      return res.status(400).json({ 
+        error: 'El nombre debe tener entre 2 y 50 caracteres' 
+      });
+    }
+    
+    if (/\d/.test(firstName.trim())) {
+      return res.status(400).json({ 
+        error: 'El nombre no puede contener números' 
+      });
+    }
+    
+    if (!nameRegex.test(firstName.trim())) {
+      return res.status(400).json({ 
+        error: 'El nombre solo puede contener letras, espacios, guiones y apóstrofes' 
+      });
+    }
+    
+    if (lastName.trim().length < 2 || lastName.trim().length > 50) {
+      return res.status(400).json({ 
+        error: 'El apellido debe tener entre 2 y 50 caracteres' 
+      });
+    }
+    
+    if (/\d/.test(lastName.trim())) {
+      return res.status(400).json({ 
+        error: 'El apellido no puede contener números' 
+      });
+    }
+    
+    if (!nameRegex.test(lastName.trim())) {
+      return res.status(400).json({ 
+        error: 'El apellido solo puede contener letras, espacios, guiones y apóstrofes' 
       });
     }
 
@@ -254,6 +338,45 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Nombre y apellido son requeridos' })
     }
 
+    // Enhanced name validation - prevent numbers and suspicious patterns
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]+$/;
+    
+    if (firstName.trim().length < 2 || firstName.trim().length > 50) {
+      return res.status(400).json({ 
+        error: 'El nombre debe tener entre 2 y 50 caracteres' 
+      });
+    }
+    
+    if (/\d/.test(firstName.trim())) {
+      return res.status(400).json({ 
+        error: 'El nombre no puede contener números' 
+      });
+    }
+    
+    if (!nameRegex.test(firstName.trim())) {
+      return res.status(400).json({ 
+        error: 'El nombre solo puede contener letras, espacios, guiones y apóstrofes' 
+      });
+    }
+    
+    if (lastName.trim().length < 2 || lastName.trim().length > 50) {
+      return res.status(400).json({ 
+        error: 'El apellido debe tener entre 2 y 50 caracteres' 
+      });
+    }
+    
+    if (/\d/.test(lastName.trim())) {
+      return res.status(400).json({ 
+        error: 'El apellido no puede contener números' 
+      });
+    }
+    
+    if (!nameRegex.test(lastName.trim())) {
+      return res.status(400).json({ 
+        error: 'El apellido solo puede contener letras, espacios, guiones y apóstrofes' 
+      });
+    }
+
     const client = await pool.connect()
     try {
       const result = await client.query(
@@ -286,6 +409,71 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Error interno del servidor' })
   }
 })
+
+// Delete account endpoint
+app.delete('/api/auth/account', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log('DELETE /api/auth/account - User ID:', userId);
+
+    const client = await pool.connect();
+    try {
+      // Start transaction
+      await client.query('BEGIN');
+
+      // Delete user's addresses
+      await client.query('DELETE FROM addresses WHERE user_id = $1', [userId]);
+      console.log('Deleted addresses for user:', userId);
+
+      // Delete user's table reservations
+      await client.query('DELETE FROM table_reservations WHERE user_id = $1', [userId]);
+      console.log('Deleted table reservations for user:', userId);
+
+      // Delete user's cart items and cart
+      await client.query('DELETE FROM cart_items WHERE cart_id IN (SELECT id FROM shopping_carts WHERE user_id = $1)', [userId]);
+      await client.query('DELETE FROM shopping_carts WHERE user_id = $1', [userId]);
+      console.log('Deleted shopping cart for user:', userId);
+
+      // Delete user's orders (keep order history but remove user association)
+      await client.query('UPDATE orders SET user_id = NULL WHERE user_id = $1', [userId]);
+      console.log('Removed user association from orders for user:', userId);
+
+      // Finally, delete the user
+      const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING id, email', [userId]);
+      
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
+      // Commit transaction
+      await client.query('COMMIT');
+      
+      console.log('Account deleted successfully for user:', userId);
+      
+      res.json({
+        success: true,
+        message: 'Cuenta eliminada exitosamente',
+        deletedUser: {
+          id: result.rows[0].id,
+          email: result.rows[0].email
+        }
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error('Account deletion error:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor al eliminar la cuenta' 
+    });
+  }
+});
 
 // Products Routes (existing)
 app.get('/api/products', async (req, res) => {
@@ -342,10 +530,81 @@ app.post('/api/reservations', async (req, res) => {
       reservationTime, 
       numberOfGuests, 
       specialRequests,
-      userId = null
+      userId = null,
+      recaptchaToken // For guest reservations
     } = req.body
 
-    // Validation
+    // SECURITY VALIDATION FOR GUEST RESERVATIONS
+    if (!userId) {
+      console.log('🔒 Guest reservation detected - applying security measures...')
+
+      // 1. CAPTCHA Verification for guest reservations
+      if (!recaptchaToken) {
+        return res.status(400).json({ error: 'CAPTCHA verification required for guest reservations' })
+      }
+
+      // Development mode: Use mock token for testing
+      if (process.env.NODE_ENV === 'development' && recaptchaToken === 'mock_recaptcha_token_dev') {
+        console.log('🔄 Development mode: Using mock CAPTCHA token for testing')
+        // Skip CAPTCHA verification in development with mock token
+      } else {
+        const captchaResult = await captchaService.performSecurityCheck({
+          recaptchaToken,
+          action: 'reservation',
+          ip: req.ip || req.connection.remoteAddress,
+          userAgent: req.get('User-Agent'),
+          referrer: req.get('Referrer'),
+          timestamp: Date.now()
+        })
+
+        if (!captchaResult.allowed) {
+          console.log('🚫 Guest reservation blocked by CAPTCHA:', captchaResult.overallRisk)
+          return res.status(400).json({ error: `Reservation blocked: ${captchaResult.recommendations.join(', ')}` })
+        }
+      }
+
+      // 2. Rate Limiting for guest reservations
+      const rateLimitResult = rateLimitService.checkReservationRateLimit({
+        ip: req.ip || req.connection.remoteAddress,
+        userId: null,
+        email: customerEmail,
+        phone: customerPhone
+      })
+
+      if (!rateLimitResult.allowed) {
+        console.log('🚫 Guest reservation blocked by rate limiting:', rateLimitResult.reason)
+        return res.status(429).json({ error: `Reservation blocked: ${rateLimitResult.reason}` })
+      }
+
+      // 3. Enhanced Input Validation for guest reservations
+      const reservationDataForValidation = {
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
+        reservation_date: reservationDate,
+        reservation_time: reservationTime,
+        number_of_guests: numberOfGuests
+      }
+
+      const validationResult = validationService.validateReservationData(reservationDataForValidation)
+      if (!validationResult.isValid) {
+        console.log('🚫 Guest reservation blocked by validation:', validationResult.errors)
+        return res.status(400).json({ error: `Validation failed: ${validationResult.errors.join(', ')}` })
+      }
+
+      console.log('✅ Guest reservation passed all security checks')
+
+      // Record the request for rate limiting
+      rateLimitService.recordRequest(
+        req.ip || req.connection.remoteAddress,
+        null,
+        customerEmail,
+        customerPhone,
+        'reservation'
+      )
+    }
+
+    // Basic validation (existing code)
     if (!customerName || !customerEmail || !customerPhone || !reservationDate || !reservationTime || !numberOfGuests) {
       return res.status(400).json({ error: 'Todos los campos requeridos deben estar completos' })
     }

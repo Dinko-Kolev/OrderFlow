@@ -1,6 +1,16 @@
 {
   "/_app": "pages/_app.js",
-  "/_error": "pages/_error.js",
+  "/checkout": "pages/checkout.html",
   "/_document": "pages/_document.js",
-  "/": "pages/index.js"
+  "/contact": "pages/contact.html",
+  "/": "pages/index.html",
+  "/login": "pages/login.html",
+  "/menu": "pages/menu.html",
+  "/order": "pages/order.html",
+  "/profile": "pages/profile.html",
+  "/order/[orderNumber]": "pages/order/[orderNumber].html",
+  "/reservations": "pages/reservations.html",
+  "/register": "pages/register.html",
+  "/_error": "pages/_error.js",
+  "/404": "pages/404.html"
 }

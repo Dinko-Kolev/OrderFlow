@@ -131,15 +131,23 @@ class ApiClient {
 
   // DELETE request
   async delete(endpoint, options = {}) {
-    return this.request(endpoint, {
+    console.log('🗑️ DELETE request:', { endpoint, options });
+    const result = await this.request(endpoint, {
       method: 'DELETE',
       ...options
-    })
+    });
+    console.log('🗑️ DELETE response:', result);
+    return result;
   }
 
   // Add authentication token to requests
   setAuthToken(token) {
     this.authToken = token
+  }
+
+  // Clear authentication token
+  clearAuthToken() {
+    this.authToken = null
   }
 
   // Get authenticated headers
@@ -174,6 +182,9 @@ export const api = {
       }
     }),
     logout: () => apiClient.post(API_ENDPOINTS.LOGOUT, {}, {
+      headers: apiClient.getAuthHeaders()
+    }),
+    deleteAccount: () => apiClient.delete('/api/auth/account', {
       headers: apiClient.getAuthHeaders()
     })
   },
@@ -303,6 +314,7 @@ export const api = {
 
   // Utility methods
   setAuthToken: (token) => apiClient.setAuthToken(token),
+  clearAuthToken: () => apiClient.clearAuthToken(),
   clearCache: () => apiClient.clearCache()
 }
 

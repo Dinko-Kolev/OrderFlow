@@ -69,3 +69,26 @@
     @apply pb-48 sm:pb-0;
   }
 } 
+
+/* Hide Google reCAPTCHA badge globally */
+.grecaptcha-badge {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Alternative method to hide badge */
+iframe[src*="google.com/recaptcha"] {
+  display: none !important;
+}
+
+/* Hide reCAPTCHA elements that might appear, but NOT the button we created */
+[data-recaptcha] {
+  /* Don't hide the entire container - just the Google elements */
+}
+
+/* Hide only the Google reCAPTCHA elements, not our custom button */
+[data-recaptcha] iframe,
+[data-recaptcha] .grecaptcha-badge {
+  display: none !important;
+} 

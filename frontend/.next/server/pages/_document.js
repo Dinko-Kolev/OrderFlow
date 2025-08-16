@@ -1,56 +1,6 @@
-"use strict";
-/*
- * ATTENTION: An "eval-source-map" devtool has been used.
- * This devtool is neither made for production nor for readable output files.
- * It uses "eval()" calls to create a separate source file with attached SourceMaps in the browser devtools.
- * If you are trying to read the output file, select a different devtool (https://webpack.js.org/configuration/devtool/)
- * or disable the default devtool with "devtool: false".
- * If you are looking for production-ready output files, see mode: "production" (https://webpack.js.org/configuration/mode/).
- */
-(() => {
-var exports = {};
-exports.id = "pages/_document";
-exports.ids = ["pages/_document"];
-exports.modules = {
-
-/***/ "next/dist/compiled/next-server/pages.runtime.dev.js":
-/*!**********************************************************************!*\
-  !*** external "next/dist/compiled/next-server/pages.runtime.dev.js" ***!
-  \**********************************************************************/
-/***/ ((module) => {
-
-module.exports = require("next/dist/compiled/next-server/pages.runtime.dev.js");
-
-/***/ }),
-
-/***/ "react":
-/*!************************!*\
-  !*** external "react" ***!
-  \************************/
-/***/ ((module) => {
-
-module.exports = require("react");
-
-/***/ }),
-
-/***/ "path":
-/*!***********************!*\
-  !*** external "path" ***!
-  \***********************/
-/***/ ((module) => {
-
-module.exports = require("path");
-
-/***/ })
-
-};
-;
-
-// load runtime
-var __webpack_require__ = require("../webpack-runtime.js");
-__webpack_require__.C(exports);
-var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, ["vendor-chunks/next","vendor-chunks/@swc"], () => (__webpack_exec__("./node_modules/next/dist/pages/_document.js")));
-module.exports = __webpack_exports__;
-
-})();
+"use strict";(()=>{var a={};a.id=220,a.ids=[220],a.modules={361:a=>{a.exports=require("next/dist/compiled/next-server/pages.runtime.prod.js")},2015:a=>{a.exports=require("react")},3873:a=>{a.exports=require("path")},6483:(a,b,c)=>{c.d(b,{Ay:()=>e,KB:()=>g,Sn:()=>f});let d={API_BASE_URL:process.env.NEXT_PUBLIC_API_URL||"http://localhost:3001",APP_NAME:"Bella Vista Restaurant",APP_DESCRIPTION:"Aut\xe9ntica cocina italiana con ingredientes frescos y recetas tradicionales",APP_URL:process.env.NEXT_PUBLIC_APP_URL||"http://localhost:3000",BUSINESS:{name:"Bella Vista",phone:"(555) 123-PIZZA",email:"hello@bellavista.com",address:"Calle Gran V\xeda, 123, 28013 Madrid, Espa\xf1a",hours:"Lun-Dom: 11:00 - 23:00",delivery:"Entrega hasta las 22:30"},FEATURES:{enableSocialLogin:!0,enablePushNotifications:!1,enableRealTimeOrders:!1,enablePayments:!1},CACHE_TTL:3e5,IMAGE_OPTIMIZATION:!0,FORCE_HTTPS:!0,CSRF_PROTECTION:!0,GOOGLE_ANALYTICS_ID:process.env.NEXT_PUBLIC_GA_ID,SOCIAL:{facebook:"#",instagram:"#",twitter:"#"}},e=d,f={LOGIN:"/api/auth/login",REGISTER:"/api/auth/register",PROFILE:"/api/auth/profile",LOGOUT:"/api/auth/logout",PRODUCTS:"/api/products",CATEGORIES:"/api/products/categories",ORDERS:"/api/orders",ORDER_HISTORY:"/api/orders/history",HEALTH:"/health"},g=a=>`${d.API_BASE_URL}${a}`},8732:a=>{a.exports=require("react/jsx-runtime")},9674:(a,b,c)=>{c.r(b),c.d(b,{default:()=>g});var d=c(8732),e=c(2341),f=c(6483);function g(){return(0,d.jsxs)(e.Html,{lang:"es",children:[(0,d.jsxs)(e.Head,{children:[(0,d.jsx)("meta",{charSet:"utf-8"}),(0,d.jsx)("meta",{name:"author",content:f.Ay.BUSINESS.name}),(0,d.jsx)("meta",{name:"robots",content:"index, follow"}),(0,d.jsx)("meta",{name:"googlebot",content:"index, follow"}),(0,d.jsx)("link",{rel:"icon",href:"/favicon.ico"}),(0,d.jsx)("link",{rel:"apple-touch-icon",sizes:"180x180",href:"/apple-touch-icon.png"}),(0,d.jsx)("link",{rel:"icon",type:"image/png",sizes:"32x32",href:"/favicon-32x32.png"}),(0,d.jsx)("link",{rel:"icon",type:"image/png",sizes:"16x16",href:"/favicon-16x16.png"}),(0,d.jsx)("link",{rel:"manifest",href:"/site.webmanifest"}),(0,d.jsx)("link",{rel:"preconnect",href:"https://fonts.googleapis.com"}),(0,d.jsx)("link",{rel:"preconnect",href:"https://fonts.gstatic.com",crossOrigin:"true"}),(0,d.jsx)("link",{rel:"dns-prefetch",href:"https://fonts.googleapis.com"}),(0,d.jsx)("meta",{httpEquiv:"X-Content-Type-Options",content:"nosniff"}),(0,d.jsx)("meta",{httpEquiv:"X-Frame-Options",content:"DENY"}),(0,d.jsx)("meta",{httpEquiv:"X-XSS-Protection",content:"1; mode=block"}),(0,d.jsx)("meta",{name:"theme-color",content:"#f97316"}),(0,d.jsx)("meta",{name:"msapplication-TileColor",content:"#f97316"}),(0,d.jsx)("script",{type:"application/ld+json",dangerouslySetInnerHTML:{__html:JSON.stringify({"@context":"https://schema.org","@type":"Restaurant",name:f.Ay.BUSINESS.name,description:f.Ay.APP_DESCRIPTION,url:f.Ay.APP_URL,telephone:f.Ay.BUSINESS.phone,email:f.Ay.BUSINESS.email,address:{"@type":"PostalAddress",streetAddress:"Calle Gran V\xeda, 123",addressLocality:"Madrid",postalCode:"28013",addressCountry:"ES"},openingHours:"Mo-Su 11:00-23:00",servesCuisine:"Italian",priceRange:"$$",acceptsReservations:!0,hasDeliveryService:!0,aggregateRating:{"@type":"AggregateRating",ratingValue:"4.9",reviewCount:"150"}})}}),f.Ay.GOOGLE_ANALYTICS_ID&&(0,d.jsxs)(d.Fragment,{children:[(0,d.jsx)("script",{async:!0,src:`https://www.googletagmanager.com/gtag/js?id=${f.Ay.GOOGLE_ANALYTICS_ID}`}),(0,d.jsx)("script",{dangerouslySetInnerHTML:{__html:`
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${f.Ay.GOOGLE_ANALYTICS_ID}');
+                `}})]})]}),(0,d.jsxs)("body",{children:[(0,d.jsx)("a",{href:"#main-content",className:"sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 bg-primary text-white p-2 z-50",children:"Saltar al contenido principal"}),(0,d.jsx)(e.Main,{}),(0,d.jsx)(e.NextScript,{}),(0,d.jsx)("noscript",{children:(0,d.jsx)("div",{style:{position:"fixed",top:0,left:0,right:0,bottom:0,backgroundColor:"rgba(0,0,0,0.8)",color:"white",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,textAlign:"center",padding:"20px"},children:(0,d.jsxs)("div",{children:[(0,d.jsx)("h1",{children:"JavaScript Requerido"}),(0,d.jsx)("p",{children:"Este sitio web requiere JavaScript para funcionar correctamente."}),(0,d.jsx)("p",{children:"Por favor, habilita JavaScript en tu navegador."})]})})})]})]})}}};var b=require("../webpack-runtime.js");b.C(a);var c=b.X(0,[89,341],()=>b(b.s=9674));module.exports=c})();

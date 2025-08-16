@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -6,6 +6,7 @@ import { ArrowLeft, ShoppingBag, User, MapPin, CreditCard, Clock, Check, AlertCi
 import { useCart } from '../contexts/CartContext'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
+import CAPTCHA from '../components/CAPTCHA'
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -27,6 +28,12 @@ export default function CheckoutPage() {
     paymentMethod: 'card',
     specialInstructions: ''
   })
+
+  // CAPTCHA state for guest orders
+  const [captchaToken, setCaptchaToken] = useState(null)
+  const [captchaVerified, setCaptchaVerified] = useState(false)
+  const [captchaLoading, setCaptchaLoading] = useState(false)
+  const captchaRef = useRef(null)
 
   // Address management state
   const [addresses, setAddresses] = useState([])
@@ -171,6 +178,46 @@ export default function CheckoutPage() {
     return Object.keys(errs).length === 0
   }
 
+  // CAPTCHA verification for guest orders
+  const handleCaptchaVerify = (token) => {
+    try {
+      // Validate token
+      if (!token || typeof token !== 'string') {
+        console.error('❌ Invalid CAPTCHA token received:', token);
+        setErrors(prev => ({ ...prev, captcha: 'Error en la verificación CAPTCHA. Inténtalo de nuevo.' }));
+        setCaptchaLoading(false);
+        return;
+      }
+
+      // Log successful verification
+      console.log('✅ CAPTCHA verified with token:', token.substring(0, 20) + '...');
+      
+      // Update state
+      setCaptchaToken(token);
+      setCaptchaVerified(true);
+      setCaptchaLoading(false);
+      
+      // Clear any previous CAPTCHA errors
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.captcha;
+        return newErrors;
+      });
+      
+    } catch (error) {
+      console.error('❌ CAPTCHA verification error:', error);
+      setErrors(prev => ({ ...prev, captcha: 'Error en la verificación CAPTCHA. Inténtalo de nuevo.' }));
+      setCaptchaLoading(false);
+    }
+  }
+
+  // CAPTCHA timeout handler
+  const handleCaptchaTimeout = () => {
+    console.log('⏰ CAPTCHA verification timeout');
+    setCaptchaLoading(false);
+    setErrors(prev => ({ ...prev, captcha: 'Tiempo de espera agotado. Inténtalo de nuevo.' }));
+  }
+
   // Save new address
   const saveAddress = async () => {
     try {
@@ -216,25 +263,78 @@ export default function CheckoutPage() {
     setShowAddressModal(true)
   }
 
+  // Enhanced form validation with security checks
   const validateForm = () => {
     const newErrors = {}
 
+    // Enhanced name validation
     if (!formData.customerName.trim()) {
       newErrors.customerName = 'El nombre es obligatorio'
+    } else if (formData.customerName.trim().length < 2) {
+      newErrors.customerName = 'El nombre debe tener al menos 2 caracteres'
+    } else if (formData.customerName.trim().length > 100) {
+      newErrors.customerName = 'El nombre no puede exceder 100 caracteres'
+    } else if (/\d/.test(formData.customerName.trim())) {
+      newErrors.customerName = 'El nombre no puede contener números'
+    } else if (!/^[a-zA-ZÀ-ÿ\s'-]+$/.test(formData.customerName.trim())) {
+      newErrors.customerName = 'El nombre solo puede contener letras, espacios, guiones y apóstrofes'
     }
 
+    // Enhanced email validation
     if (!formData.customerEmail.trim()) {
       newErrors.customerEmail = 'El email es obligatorio'
     } else if (!/\S+@\S+\.\S+/.test(formData.customerEmail)) {
       newErrors.customerEmail = 'Email inválido'
+    } else if (formData.customerEmail.trim().length > 254) {
+      newErrors.customerEmail = 'El email no puede exceder 254 caracteres'
+    } else if (formData.customerEmail.includes('..') || formData.customerEmail.includes('--')) {
+      newErrors.customerEmail = 'Formato de email inválido'
     }
 
+    // Enhanced phone validation
     if (!formData.customerPhone.trim()) {
       newErrors.customerPhone = 'El teléfono es obligatorio'
+    } else if (!/^[+]?[\d\s\-()]{8,20}$/.test(formData.customerPhone)) {
+      newErrors.customerPhone = 'Formato de teléfono inválido (8-20 dígitos)'
+    } else if (formData.customerPhone.replace(/[\d\s\-()]/g, '').length > 0) {
+      newErrors.customerPhone = 'El teléfono solo puede contener números, espacios, guiones y paréntesis'
     }
 
-    if (formData.deliveryType === 'delivery' && !formData.deliveryAddress.trim()) {
-      newErrors.deliveryAddress = 'La dirección de entrega es obligatoria'
+    // Enhanced address validation for delivery
+    if (formData.deliveryType === 'delivery') {
+      if (!formData.deliveryAddress.trim()) {
+        newErrors.deliveryAddress = 'La dirección de entrega es obligatoria'
+      } else if (formData.deliveryAddress.trim().length < 10) {
+        newErrors.deliveryAddress = 'La dirección debe tener al menos 10 caracteres'
+      } else if (formData.deliveryAddress.trim().length > 500) {
+        newErrors.deliveryAddress = 'La dirección no puede exceder 500 caracteres'
+      }
+    }
+
+    // CAPTCHA verification required for guest orders
+    if (!user && !captchaVerified) {
+      newErrors.captcha = 'Verificación CAPTCHA requerida para pedidos sin registro'
+    }
+
+    // Anti-spam: Check for suspicious patterns
+    const suspiciousPatterns = [
+      /test/i,
+      /example/i,
+      /fake/i,
+      /spam/i,
+      /bot/i,
+      /admin/i,
+      /root/i,
+      /guest/i,
+      /user/i
+    ]
+    
+    if (suspiciousPatterns.some(pattern => pattern.test(formData.customerName))) {
+      newErrors.customerName = 'Nombre no válido'
+    }
+    
+    if (suspiciousPatterns.some(pattern => pattern.test(formData.customerEmail))) {
+      newErrors.customerEmail = 'Email no válido'
     }
 
     setErrors(newErrors)
@@ -278,6 +378,7 @@ export default function CheckoutPage() {
         deliveryAddress: formData.deliveryAddress,
         paymentMethod: formData.paymentMethod,
         specialInstructions: formData.specialInstructions,
+        recaptchaToken: captchaToken, // Add captchaToken to order data
         items: items.map(item => ({
           productId: item.product_id,
           quantity: item.quantity,
@@ -301,6 +402,12 @@ export default function CheckoutPage() {
       if (response.success) {
         // Clear cart
         await clearCart()
+        
+        // Reset CAPTCHA state for guest users
+        if (!user) {
+          setCaptchaToken(null)
+          setCaptchaVerified(false)
+        }
         
         // Redirect to order confirmation
         // Check if response.order exists and has orderNumber, otherwise use response.orderNumber directly
@@ -725,6 +832,41 @@ export default function CheckoutPage() {
 
               {/* Submit Button */}
               <div className="bg-white rounded-2xl shadow-lg p-6">
+                {/* CAPTCHA Verification for Guest Users */}
+                {!user && (
+                  <div className="mb-6 p-4 border-2 border-dashed border-gray-300 rounded-xl">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 text-sm">🔒</span>
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Verificación de Seguridad</h3>
+                    </div>
+                    
+                    <p className="text-sm text-gray-600 mb-4">
+                      Para proteger contra pedidos automatizados, necesitamos verificar que eres humano.
+                    </p>
+                    
+                    {!captchaVerified ? (
+                      <div className="space-y-3">
+                        <CAPTCHA 
+                          ref={captchaRef} 
+                          onVerify={handleCaptchaVerify} 
+                          onTimeout={handleCaptchaTimeout} 
+                          action="order"
+                        />
+                        {errors.captcha && (
+                          <p className="text-red-500 text-sm">{errors.captcha}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-green-600">
+                        <Check className="w-5 h-5" />
+                        <span className="font-medium">✅ Verificación completada</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {errors.submit && (
                   <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
                     <AlertCircle className="w-5 h-5 text-red-500" />
