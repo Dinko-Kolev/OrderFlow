@@ -314,6 +314,17 @@ class ValidationService {
      */
     validateOrderData(orderData) {
         try {
+            // Handle null/undefined input
+            if (!orderData || typeof orderData !== 'object') {
+                return {
+                    isValid: false,
+                    errors: ['Order data is required and must be an object'],
+                    warnings: [],
+                    score: 0,
+                    sanitizedData: null
+                };
+            }
+
             const errors = [];
             const warnings = [];
             let overallScore = 100;
@@ -365,11 +376,13 @@ class ValidationService {
                 sanitizedData: errors.length === 0 ? this.sanitizeOrderData(orderData) : null
             };
         } catch (error) {
-            logger.error('Order data validation error:', error);
+            console.error('Order data validation error:', error);
             return {
                 isValid: false,
                 errors: ['Order validation failed due to system error'],
-                score: 0
+                warnings: [],
+                score: 0,
+                sanitizedData: null
             };
         }
     }
