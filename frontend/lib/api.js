@@ -202,6 +202,7 @@ export const api = {
   reservations: {
     create: (reservationData) => apiClient.post('/api/reservations', reservationData),
     getAvailability: (date) => apiClient.get(`/api/reservations/availability/${date}`),
+    getTableOverview: (date) => apiClient.get(`/api/reservations/tables/${date}`),
     getUserReservations: () => apiClient.get('/api/reservations/user', {
       headers: apiClient.getAuthHeaders()
     }),

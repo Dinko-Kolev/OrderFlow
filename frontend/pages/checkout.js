@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ShoppingBag, User, MapPin, CreditCard, Clock, Check, AlertCircle } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, User, MapPin, CreditCard, Clock, Check, AlertCircle, Plus, ChevronDown } from 'lucide-react'
 import { useCart } from '../contexts/CartContext'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
@@ -22,9 +23,25 @@ export default function CheckoutPage() {
     customerPhone: '',
     deliveryType: 'delivery',
     deliveryAddress: '',
+    selectedAddressId: null,
     paymentMethod: 'card',
     specialInstructions: ''
   })
+
+  // Address management state
+  const [addresses, setAddresses] = useState([])
+  const [addressesLoading, setAddressesLoading] = useState(false)
+  const [showAddressModal, setShowAddressModal] = useState(false)
+  const [addressForm, setAddressForm] = useState({
+    street: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    is_default: false
+  })
+  const [addressErrors, setAddressErrors] = useState({})
+  const [showAddressDropdown, setShowAddressDropdown] = useState(false)
+  const [addressSuccessMessage, setAddressSuccessMessage] = useState('')
 
   // Default address state (from user's saved addresses)
   const [autoFilledAddress, setAutoFilledAddress] = useState(false)
@@ -42,28 +59,44 @@ export default function CheckoutPage() {
     }
   }, [user])
 
+  // Fetch user addresses
+  const fetchAddresses = async () => {
+    if (!user?.id) return
+    try {
+      setAddressesLoading(true)
+      const res = await api.addresses.getForUser(user.id)
+      const list = res?.data?.addresses || res?.addresses || res?.data || []
+      setAddresses(Array.isArray(list) ? list : [])
+    } catch (e) {
+      console.error('Failed to load addresses', e)
+      setAddresses([])
+    } finally {
+      setAddressesLoading(false)
+    }
+  }
+
+  // Load addresses when user is available
+  useEffect(() => {
+    if (user?.id && formData.deliveryType === 'delivery') {
+      fetchAddresses()
+    }
+  }, [user?.id, formData.deliveryType])
+
   // Prefill default address when delivery is selected
   useEffect(() => {
-    const fetchDefaultAddress = async () => {
-      if (!user?.id || formData.deliveryType !== 'delivery') return
-      try {
-        const res = await api.addresses.getForUser(user.id)
-        const list = res?.data?.addresses || res?.addresses || res?.data || []
-        if (Array.isArray(list) && list.length > 0) {
-          const def = list.find(a => a.is_default) || list[0]
-          if (def && !formData.deliveryAddress) {
-            const formatted = `${def.street}, ${def.zip_code} ${def.city}, ${def.state}`
-            setFormData(prev => ({ ...prev, deliveryAddress: formatted }))
-            setAutoFilledAddress(true)
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load default address', e)
+    if (formData.deliveryType === 'delivery' && addresses.length > 0) {
+      const defaultAddr = addresses.find(a => a.is_default) || addresses[0]
+      if (defaultAddr && !formData.deliveryAddress) {
+        const formatted = `${defaultAddr.street}, ${defaultAddr.zip_code} ${defaultAddr.city}, ${defaultAddr.state}`
+        setFormData(prev => ({ 
+          ...prev, 
+          deliveryAddress: formatted,
+          selectedAddressId: defaultAddr.id
+        }))
+        setAutoFilledAddress(true)
       }
     }
-    fetchDefaultAddress()
-    // run when user id or deliveryType changes
-  }, [user?.id, formData.deliveryType])
+  }, [addresses, formData.deliveryType])
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -98,6 +131,89 @@ export default function CheckoutPage() {
         [name]: ''
       }))
     }
+  }
+
+  // Handle address selection from dropdown
+  const handleAddressSelect = (address) => {
+    const formatted = `${address.street}, ${address.zip_code} ${address.city}, ${address.state}`
+    setFormData(prev => ({
+      ...prev,
+      deliveryAddress: formatted,
+      selectedAddressId: address.id
+    }))
+    setShowAddressDropdown(false)
+    setAutoFilledAddress(true)
+  }
+
+  // Handle manual address input
+  const handleManualAddressInput = (e) => {
+    setFormData(prev => ({
+      ...prev,
+      deliveryAddress: e.target.value,
+      selectedAddressId: null
+    }))
+    setAutoFilledAddress(false)
+    
+    // Clear any success message when user starts typing manually
+    if (addressSuccessMessage) {
+      setAddressSuccessMessage('')
+    }
+  }
+
+  // Address form validation
+  const validateAddressForm = () => {
+    const errs = {}
+    if (!addressForm.street.trim()) errs.street = 'Requerido'
+    if (!addressForm.city.trim()) errs.city = 'Requerido'
+    if (!addressForm.state.trim()) errs.state = 'Requerido'
+    if (!addressForm.zip_code.trim()) errs.zip_code = 'Requerido'
+    setAddressErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  // Save new address
+  const saveAddress = async () => {
+    try {
+      if (!validateAddressForm()) return
+      
+      const res = await api.addresses.create(user.id, addressForm)
+      if (res?.success) {
+        // Refresh addresses and select the new one
+        await fetchAddresses()
+        setShowAddressModal(false)
+        
+        // Find the newly created address and select it
+        const newAddress = res.data || res
+        if (newAddress) {
+          handleAddressSelect(newAddress)
+          setAddressSuccessMessage('¡Dirección creada y seleccionada exitosamente!')
+          setTimeout(() => setAddressSuccessMessage(''), 5000) // Hide after 5 seconds
+        }
+      } else {
+        alert(res?.error || 'No se pudo guardar la dirección')
+      }
+    } catch (e) {
+      console.error('Failed to save address', e)
+      alert('Error de conexión al guardar la dirección')
+    }
+  }
+
+  // Reset address form
+  const resetAddressForm = () => {
+    setAddressForm({
+      street: '',
+      city: '',
+      state: '',
+      zip_code: '',
+      is_default: false
+    })
+    setAddressErrors({})
+  }
+
+  // Open address creation modal
+  const openAddressModal = () => {
+    resetAddressForm()
+    setShowAddressModal(true)
   }
 
   const validateForm = () => {
@@ -319,7 +435,15 @@ export default function CheckoutPage() {
 
                 <div className="grid md:grid-cols-2 gap-4 mb-4">
                   <div
-                    onClick={() => setFormData(prev => ({ ...prev, deliveryType: 'delivery' }))}
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, deliveryType: 'delivery' }))
+                      // Reset address selection when switching to delivery
+                      if (formData.deliveryType !== 'delivery') {
+                        setFormData(prev => ({ ...prev, deliveryAddress: '', selectedAddressId: null }))
+                        setAutoFilledAddress(false)
+                        setAddressSuccessMessage('')
+                      }
+                    }}
                     className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
                       formData.deliveryType === 'delivery'
                         ? 'border-primary bg-primary/5'
@@ -339,7 +463,15 @@ export default function CheckoutPage() {
                   </div>
 
                   <div
-                    onClick={() => setFormData(prev => ({ ...prev, deliveryType: 'pickup' }))}
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, deliveryType: 'pickup' }))
+                      // Clear address when switching to pickup
+                      if (formData.deliveryType === 'delivery') {
+                        setFormData(prev => ({ ...prev, deliveryAddress: '', selectedAddressId: null }))
+                        setAutoFilledAddress(false)
+                        setAddressSuccessMessage('')
+                      }
+                    }}
                     className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
                       formData.deliveryType === 'pickup'
                         ? 'border-primary bg-primary/5'
@@ -364,18 +496,157 @@ export default function CheckoutPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Dirección de Entrega *
                     </label>
-                    <textarea
-                      name="deliveryAddress"
-                      value={formData.deliveryAddress}
-                      onChange={handleInputChange}
-                      rows={3}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-colors resize-none ${
-                        errors.deliveryAddress ? 'border-red-500' : 'border-gray-300'
-                      } ${autoFilledAddress ? 'bg-green-50' : ''}`}
-                      placeholder="Calle, número, piso, puerta, código postal, ciudad..."
-                    />
+                    <p className="text-xs text-gray-500 mb-3">
+                      Selecciona una dirección guardada o crea una nueva para agilizar tu pedido
+                    </p>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="deliveryAddress"
+                        value={formData.deliveryAddress}
+                        onChange={handleManualAddressInput}
+                        className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                          errors.deliveryAddress ? 'border-red-500' : 'border-gray-300'
+                        } ${formData.selectedAddressId ? 'bg-green-50 border-green-300' : ''}`}
+                        placeholder="Calle, número, piso, puerta, código postal, ciudad..."
+                      />
+                      {formData.selectedAddressId && (
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                          <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-green-600" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     {errors.deliveryAddress && (
                       <p className="text-red-500 text-sm mt-1">{errors.deliveryAddress}</p>
+                    )}
+
+                    {/* Success Message */}
+                    {addressSuccessMessage && (
+                      <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-green-800">
+                          <Check className="w-4 h-4 text-green-600" />
+                          <span className="text-sm font-medium">{addressSuccessMessage}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Clear Address Button when using saved address */}
+                    {formData.selectedAddressId && (
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ 
+                              ...prev, 
+                              deliveryAddress: '',
+                              selectedAddressId: null 
+                            }))
+                            setAutoFilledAddress(false)
+                          }}
+                          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                        >
+                          <span>Limpiar dirección guardada</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Address Selection Section */}
+                    {addressesLoading ? (
+                      <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-center text-gray-500">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                          Cargando direcciones...
+                        </div>
+                      </div>
+                    ) : addresses.length > 0 ? (
+                      <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddressDropdown(!showAddressDropdown)}
+                          className="w-full px-4 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 flex items-center justify-between"
+                        >
+                          <span>
+                            {formData.selectedAddressId ? 'Dirección guardada' : `Seleccionar dirección guardada (${addresses.length})`}
+                          </span>
+                          <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${showAddressDropdown ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showAddressDropdown && (
+                          <div className="py-2">
+                            {addresses.map((address) => (
+                              <button
+                                key={address.id}
+                                type="button"
+                                onClick={() => handleAddressSelect(address)}
+                                className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between"
+                              >
+                                <div className="text-left">
+                                  <span className="font-medium">{address.street}</span>
+                                  <span className="text-gray-500 ml-2">{`${address.zip_code} ${address.city}, ${address.state}`}</span>
+                                  {address.is_default && (
+                                    <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                                      Predeterminada
+                                    </span>
+                                  )}
+                                </div>
+                                {formData.selectedAddressId === address.id && (
+                                  <Check className="w-4 h-4 text-primary" />
+                                )}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={openAddressModal}
+                              className="w-full px-4 py-2 text-sm text-primary hover:bg-primary/10"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Nueva dirección
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({ ...prev, selectedAddressId: null }))
+                                setShowAddressDropdown(false)
+                              }}
+                              className="w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 border-t border-gray-200"
+                            >
+                              Usar dirección manual
+                            </button>
+                            <div className="border-t border-gray-200 pt-2 mt-2">
+                              <Link href="/profile" className="w-full px-4 py-2 text-sm text-gray-500 hover:text-gray-700 flex items-center justify-center gap-2">
+                                <User className="w-4 h-4" />
+                                Gestionar direcciones
+                              </Link>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Quick Address Creation when no addresses exist */
+                      <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Plus className="w-3 h-3 text-blue-600" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-blue-900 mb-2">
+                              ¿No tienes direcciones guardadas?
+                            </h4>
+                            <p className="text-sm text-blue-700 mb-3">
+                              Crea una dirección rápidamente para agilizar tu pedido
+                            </p>
+                            <button
+                              type="button"
+                              onClick={openAddressModal}
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              <Plus className="w-4 h-4" />
+                              Crear dirección
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -480,6 +751,108 @@ export default function CheckoutPage() {
                 </button>
               </div>
             </form>
+
+            {/* Address Creation Modal */}
+            {showAddressModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Nueva Dirección</h2>
+                  <form onSubmit={(e) => { e.preventDefault(); saveAddress(); }} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Calle y número *
+                      </label>
+                      <input
+                        type="text"
+                        name="street"
+                        value={addressForm.street}
+                        onChange={(e) => setAddressForm(prev => ({ ...prev, street: e.target.value }))}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                          addressErrors.street ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="Calle y número"
+                      />
+                      {addressErrors.street && <p className="text-red-500 text-xs mt-1">{addressErrors.street}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Código Postal *
+                      </label>
+                      <input
+                        type="text"
+                        name="zip_code"
+                        value={addressForm.zip_code}
+                        onChange={(e) => setAddressForm(prev => ({ ...prev, zip_code: e.target.value }))}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                          addressErrors.zip_code ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="Código Postal"
+                      />
+                      {addressErrors.zip_code && <p className="text-red-500 text-xs mt-1">{addressErrors.zip_code}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Ciudad *
+                      </label>
+                      <input
+                        type="text"
+                        name="city"
+                        value={addressForm.city}
+                        onChange={(e) => setAddressForm(prev => ({ ...prev, city: e.target.value }))}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                          addressErrors.city ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="Ciudad"
+                      />
+                      {addressErrors.city && <p className="text-red-500 text-xs mt-1">{addressErrors.city}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Provincia *
+                      </label>
+                      <input
+                        type="text"
+                        name="state"
+                        value={addressForm.state}
+                        onChange={(e) => setAddressForm(prev => ({ ...prev, state: e.target.value }))}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                          addressErrors.state ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="Provincia"
+                      />
+                      {addressErrors.state && <p className="text-red-500 text-xs mt-1">{addressErrors.state}</p>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_default"
+                        checked={addressForm.is_default}
+                        onChange={(e) => setAddressForm(prev => ({ ...prev, is_default: e.target.checked }))}
+                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                      />
+                      <label htmlFor="is_default" className="text-sm text-gray-700">
+                        Dirección por defecto
+                      </label>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddressModal(false)}
+                        className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90"
+                      >
+                        Guardar Dirección
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Order Summary */}
