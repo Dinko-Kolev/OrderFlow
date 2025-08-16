@@ -90,7 +90,7 @@ class OrderController {
       customer_name: customerName,
       customer_email: customerEmail,
       customer_phone: customerPhone,
-      delivery_type: deliveryType,
+      order_type: deliveryType,
       delivery_address_text: deliveryAddress,
       special_instructions: specialInstructions,
       subtotal: 0, // Will be calculated by service
