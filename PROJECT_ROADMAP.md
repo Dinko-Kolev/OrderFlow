@@ -22,15 +22,15 @@
   - Delivery zone verification
 
 #### **1.2 Rate Limiting & Abuse Prevention**
-- [ ] **IP-based Rate Limiting**
+- [x] **IP-based Rate Limiting**
   - Max 3 orders per IP per hour
   - Max 10 orders per IP per day
   - Progressive delays for repeated violations
-- [ ] **User-based Rate Limiting**
+- [x] **User-based Rate Limiting**
   - Max 2 orders per email per day
   - Max 5 orders per phone per week
   - Account suspension for abuse
-- [ ] **Order Flooding Protection**
+- [x] **Order Flooding Protection**
   - Cooldown periods between orders
   - Suspicious pattern detection
   - Automated blocking
