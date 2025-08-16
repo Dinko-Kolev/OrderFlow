@@ -55,10 +55,49 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const { firstName, lastName, email, phone, password } = req.body;
 
-    // Validation
+    // Enhanced validation
     if (!firstName || !lastName || !email || !phone || !password) {
       return res.status(400).json({ 
         error: 'Todos los campos son requeridos' 
+      });
+    }
+
+    // Enhanced name validation - prevent numbers and suspicious patterns
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]+$/;
+    
+    if (firstName.trim().length < 2 || firstName.trim().length > 50) {
+      return res.status(400).json({ 
+        error: 'El nombre debe tener entre 2 y 50 caracteres' 
+      });
+    }
+    
+    if (/\d/.test(firstName.trim())) {
+      return res.status(400).json({ 
+        error: 'El nombre no puede contener números' 
+      });
+    }
+    
+    if (!nameRegex.test(firstName.trim())) {
+      return res.status(400).json({ 
+        error: 'El nombre solo puede contener letras, espacios, guiones y apóstrofes' 
+      });
+    }
+    
+    if (lastName.trim().length < 2 || lastName.trim().length > 50) {
+      return res.status(400).json({ 
+        error: 'El apellido debe tener entre 2 y 50 caracteres' 
+      });
+    }
+    
+    if (/\d/.test(lastName.trim())) {
+      return res.status(400).json({ 
+        error: 'El apellido no puede contener números' 
+      });
+    }
+    
+    if (!nameRegex.test(lastName.trim())) {
+      return res.status(400).json({ 
+        error: 'El apellido solo puede contener letras, espacios, guiones y apóstrofes' 
       });
     }
 
@@ -252,6 +291,45 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
     const { firstName, lastName, phone } = req.body
     if (!firstName || !lastName) {
       return res.status(400).json({ error: 'Nombre y apellido son requeridos' })
+    }
+
+    // Enhanced name validation - prevent numbers and suspicious patterns
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]+$/;
+    
+    if (firstName.trim().length < 2 || firstName.trim().length > 50) {
+      return res.status(400).json({ 
+        error: 'El nombre debe tener entre 2 y 50 caracteres' 
+      });
+    }
+    
+    if (/\d/.test(firstName.trim())) {
+      return res.status(400).json({ 
+        error: 'El nombre no puede contener números' 
+      });
+    }
+    
+    if (!nameRegex.test(firstName.trim())) {
+      return res.status(400).json({ 
+        error: 'El nombre solo puede contener letras, espacios, guiones y apóstrofes' 
+      });
+    }
+    
+    if (lastName.trim().length < 2 || lastName.trim().length > 50) {
+      return res.status(400).json({ 
+        error: 'El apellido debe tener entre 2 y 50 caracteres' 
+      });
+    }
+    
+    if (/\d/.test(lastName.trim())) {
+      return res.status(400).json({ 
+        error: 'El apellido no puede contener números' 
+      });
+    }
+    
+    if (!nameRegex.test(lastName.trim())) {
+      return res.status(400).json({ 
+        error: 'El apellido solo puede contener letras, espacios, guiones y apóstrofes' 
+      });
     }
 
     const client = await pool.connect()
