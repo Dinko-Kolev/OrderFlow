@@ -58,7 +58,7 @@ services:
       - /app/node_modules
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -74,6 +74,48 @@ services:
       - "3000:3000"
     volumes:
       - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
+
+  admin-backend:
+    build: ./admin-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: pizza_user
+      DB_PASS: pizza_pass
+      DB_NAME: pizza_db
+      NODE_ENV: development
+      ADMIN_PORT: 3003
+      ADMIN_FRONTEND_URL: http://localhost:3002
+    ports:
+      - "3003:3003"
+    volumes:
+      - ./admin-backend:/app
+      - /app/node_modules
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  admin-dashboard:
+    build: ./admin-dashboard
+    depends_on:
+      - admin-backend
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: 1
+      PORT: 3002
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./admin-dashboard:/app
       - /app/node_modules
       - /app/.next
     restart: unless-stopped
