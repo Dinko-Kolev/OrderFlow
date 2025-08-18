@@ -110,4 +110,150 @@ router.get("/category/:categoryId", async (req, res) => {
   }
 });
 
+// Create new product (POST)
+router.post("/", async (req, res) => {
+  try {
+    const { name, description, base_price, category_id, image_url, is_available } = req.body;
+    
+    // Validate required fields
+    if (!name || !base_price || !category_id) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: name, base_price, and category_id are required"
+      });
+    }
+
+    // Validate price is a positive number
+    if (isNaN(base_price) || parseFloat(base_price) <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "base_price must be a positive number"
+      });
+    }
+
+    // Check if category exists
+    const categoryCheck = await pool.query("SELECT id FROM categories WHERE id = $1", [category_id]);
+    if (categoryCheck.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid category_id: category does not exist"
+      });
+    }
+
+    // Insert new product
+    const { rows } = await pool.query(`
+      INSERT INTO products (name, description, base_price, category_id, image_url, is_available, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      RETURNING id, name, description, base_price, category_id, image_url, is_available, created_at
+    `, [name, description || null, parseFloat(base_price), category_id, image_url || null, is_available !== false]);
+
+    res.status(201).json({
+      success: true,
+      data: rows[0],
+      message: "Product created successfully"
+    });
+  } catch (error) {
+    console.error("Product creation error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to create product",
+      message: error.message
+    });
+  }
+});
+
+// Update product (PUT)
+router.put("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, base_price, category_id, image_url, is_available } = req.body;
+    
+    // Check if product exists
+    const productCheck = await pool.query("SELECT id FROM products WHERE id = $1", [id]);
+    if (productCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Product not found"
+      });
+    }
+
+    // Validate required fields
+    if (!name || !base_price || !category_id) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: name, base_price, and category_id are required"
+      });
+    }
+
+    // Validate price is a positive number
+    if (isNaN(base_price) || parseFloat(base_price) <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "base_price must be a positive number"
+      });
+    }
+
+    // Check if category exists
+    const categoryCheck = await pool.query("SELECT id FROM categories WHERE id = $1", [category_id]);
+    if (categoryCheck.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid category_id: category does not exist"
+      });
+    }
+
+    // Update product
+    const { rows } = await pool.query(`
+      UPDATE products 
+      SET name = $1, description = $2, base_price = $3, category_id = $4, image_url = $5, is_available = $6
+      WHERE id = $7
+      RETURNING id, name, description, base_price, category_id, image_url, is_available, created_at
+    `, [name, description || null, parseFloat(base_price), category_id, image_url || null, is_available !== false, id]);
+
+    res.json({
+      success: true,
+      data: rows[0],
+      message: "Product updated successfully"
+    });
+  } catch (error) {
+    console.error("Product update error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update product",
+      message: error.message
+    });
+  }
+});
+
+// Delete product (DELETE)
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if product exists
+    const productCheck = await pool.query("SELECT id, name FROM products WHERE id = $1", [id]);
+    if (productCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Product not found"
+      });
+    }
+
+    // Delete product
+    await pool.query("DELETE FROM products WHERE id = $1", [id]);
+
+    res.json({
+      success: true,
+      message: `Product "${productCheck.rows[0].name}" deleted successfully`
+    });
+  } catch (error) {
+    console.error("Product deletion error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete product",
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
