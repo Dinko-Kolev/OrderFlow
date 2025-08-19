@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
 const { Pool } = require("pg");
 require("dotenv").config();
 
@@ -33,13 +32,10 @@ app.use(cors({
   credentials: true
 }));
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: "Too many requests from this IP, please try again later."
-});
+// Rate limiting only for public APIs (if any) - not for admin dashboard
+// Admin dashboard should have unlimited access for better user experience
 
-app.use("/api/", limiter);
+// app.use("/api/", limiter);  // Commented out - no rate limiting for admin
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

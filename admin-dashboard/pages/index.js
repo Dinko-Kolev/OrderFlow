@@ -52,6 +52,8 @@ ChartJS.register(
 );
 
 export default function Dashboard() {
+  console.log('🎯 Dashboard component rendered!');
+  
   const { isDarkMode, toggleTheme } = useTheme();
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -63,30 +65,115 @@ export default function Dashboard() {
   });
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  // New: data for category distribution
+  const [categoryChartData, setCategoryChartData] = useState(null);
+  const [categoryList, setCategoryList] = useState([]);
+  const [productList, setProductList] = useState([]);
+  // New: real order data for charts
+  const [weeklyOrdersData, setWeeklyOrdersData] = useState(null);
+  const [revenueTrendData, setRevenueTrendData] = useState(null);
 
   useEffect(() => {
+    console.log('🔄 useEffect triggered - calling fetchDashboardData');
     fetchDashboardData();
   }, []);
 
+  // Rebuild chart colors when theme changes
+  useEffect(() => {
+    if (categoryList.length > 0) {
+      setCategoryChartData(buildCategoryChartData(categoryList, productList, isDarkMode));
+    }
+  }, [isDarkMode]);
+
+  // Rebuild order charts when theme changes
+  useEffect(() => {
+    if (recentOrders.length > 0) {
+      setWeeklyOrdersData(buildWeeklyOrdersData(recentOrders, isDarkMode));
+      setRevenueTrendData(buildRevenueTrendData(recentOrders, isDarkMode));
+    }
+  }, [isDarkMode, recentOrders]);
+
   const fetchDashboardData = async () => {
     try {
-      // Fetch dashboard statistics
-      const statsResponse = await fetch('http://localhost:3003/api/admin/dashboard');
-      const statsData = await statsResponse.json();
+      console.log('🔄 Starting to fetch dashboard data...');
+      alert('🔄 fetchDashboardData called! Check console for more logs.');
       
-      if (statsData.success) {
+      // Add a small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Fetch dashboard statistics
+      const statsPromise = fetch('http://localhost:3003/api/admin/dashboard')
+        .then(r => {
+          if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+          }
+          return r.json();
+        });
+      
+      // Fetch recent orders
+      const ordersPromise = fetch('http://localhost:3003/api/admin/orders')
+        .then(r => {
+          if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+          }
+          return r.json();
+        });
+      
+      // Fetch categories and products for the doughnut chart
+      const categoriesPromise = fetch('http://localhost:3003/api/admin/categories')
+        .then(r => {
+          if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+          }
+          return r.json();
+        });
+      
+      const productsPromise = fetch('http://localhost:3003/api/admin/products')
+        .then(r => {
+          if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+          }
+          return r.json();
+        });
+
+      const [statsData, ordersData, categoriesData, productsData] = await Promise.all([
+        statsPromise, ordersPromise, categoriesPromise, productsPromise
+      ]);
+
+      if (statsData?.success) {
         setStats(statsData.data);
       }
-
-      // Fetch recent orders
-      const ordersResponse = await fetch('http://localhost:3003/api/admin/orders');
-      const ordersData = await ordersResponse.json();
-      
-      if (ordersData.success) {
-        setRecentOrders(ordersData.data.slice(0, 5));
+      if (ordersData?.success) {
+        const orders = ordersData.data || [];
+        setRecentOrders(orders.slice(0, 5));
+        
+        console.log('🔄 Building charts with orders:', orders.length);
+        
+        // Build real chart data from orders
+        setWeeklyOrdersData(buildWeeklyOrdersData(orders, isDarkMode));
+        setRevenueTrendData(buildRevenueTrendData(orders, isDarkMode));
       }
+      if (categoriesData?.success) {
+        setCategoryList(categoriesData.data || []);
+      }
+      if (productsData?.success) {
+        setProductList(productsData.data || []);
+      }
+
+      // Build chart data from live categories/products
+      const chartData = buildCategoryChartData(categoriesData?.data || [], productsData?.data || [], isDarkMode);
+      setCategoryChartData(chartData);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Error fetching dashboard data:', error);
+      
+      // If it's a rate limit error, retry after a delay
+      if (error.message.includes('429') || error.message.includes('Too Many Requests')) {
+        console.log('🔄 Rate limited, retrying in 2 seconds...');
+        setTimeout(() => {
+          fetchDashboardData();
+        }, 2000);
+        return;
+      }
     } finally {
       setLoading(false);
     }
@@ -108,6 +195,221 @@ export default function Dashboard() {
     });
   };
 
+  // Calculate month-over-month change percentage
+  const calculateMonthOverMonthChange = (currentValue, previousValue) => {
+    if (previousValue === 0) return currentValue > 0 ? 100 : 0;
+    return Math.round(((currentValue - previousValue) / previousValue) * 100);
+  };
+
+  // Get month-over-month stats for display
+  const getMonthOverMonthStats = (orders = []) => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Current month orders and revenue
+    const currentMonthOrders = orders.filter(order => {
+      const orderDate = new Date(order.created_at || order.order_date);
+      return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
+    });
+    
+    const currentMonthRevenue = currentMonthOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
+    const currentMonthCount = currentMonthOrders.length;
+    
+    // Previous month orders and revenue
+    const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    
+    const previousMonthOrders = orders.filter(order => {
+      const orderDate = new Date(order.created_at || order.order_date);
+      return orderDate.getMonth() === previousMonth && orderDate.getFullYear() === previousYear;
+    });
+    
+    const previousMonthRevenue = previousMonthOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
+    const previousMonthCount = previousMonthOrders.length;
+    
+    return {
+      ordersChange: calculateMonthOverMonthChange(currentMonthCount, previousMonthCount),
+      revenueChange: calculateMonthOverMonthChange(currentMonthRevenue, previousMonthRevenue),
+      ordersDirection: currentMonthCount >= previousMonthCount ? 'up' : 'down',
+      revenueDirection: currentMonthRevenue >= previousMonthRevenue ? 'up' : 'down'
+    };
+  };
+
+  // Build category chart data from API lists
+  const buildCategoryChartData = (categories = [], products = [], darkMode = false) => {
+    // Count products per category name; include Uncategorized if any missing
+    const nameToCount = new Map();
+    categories.forEach(c => nameToCount.set(c.name || 'Uncategorized', 0));
+    let uncategorizedCount = 0;
+
+    products.forEach(p => {
+      const name = p.category_name || 'Uncategorized';
+      if (nameToCount.has(name)) {
+        nameToCount.set(name, (nameToCount.get(name) || 0) + 1);
+      } else {
+        // If the product has a category not in categories list, count it too
+        nameToCount.set(name, 1);
+      }
+      if (!p.category_name) uncategorizedCount += 1;
+    });
+
+    const labels = Array.from(nameToCount.keys());
+    const data = Array.from(nameToCount.values());
+
+    // Color palettes
+    const lightColors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#14B8A6','#F472B6','#22C55E','#F97316','#06B6D4','#A855F7','#84CC16'];
+    const darkColors  = ['#60A5FA','#34D399','#FBBF24','#F87171','#A78BFA','#2DD4BF','#F472B6','#4ADE80','#FB923C','#22D3EE','#C084FC','#A3E635'];
+    const palette = darkMode ? darkColors : lightColors;
+
+    const backgroundColor = labels.map((_, idx) => palette[idx % palette.length]);
+
+    return {
+      labels,
+      datasets: [
+        {
+          data,
+          backgroundColor,
+          borderWidth: 0,
+        },
+      ],
+    };
+  };
+
+  // Build weekly orders data from real order data
+  const buildWeeklyOrdersData = (orders = [], darkMode = false) => {
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    
+    // Get start of current week (Sunday)
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    startOfWeek.setHours(0, 0, 0, 0); // Start at beginning of day
+    
+    // Get end of current week (Saturday)
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999); // End at end of day
+    
+    const dailyCounts = new Array(7).fill(0);
+    
+    orders.forEach(order => {
+      const orderDate = new Date(order.created_at || order.order_date);
+      // Check if order is within current week
+      if (orderDate >= startOfWeek && orderDate <= endOfWeek) {
+        const dayIndex = orderDate.getDay();
+        dailyCounts[dayIndex]++;
+      }
+    });
+    
+    return {
+      labels: daysOfWeek,
+      datasets: [
+        {
+          label: 'Orders',
+          data: dailyCounts,
+          backgroundColor: darkMode ? [
+            'rgba(96, 165, 250, 0.8)',
+            'rgba(52, 211, 153, 0.8)',
+            'rgba(251, 191, 36, 0.8)',
+            'rgba(248, 113, 113, 0.8)',
+            'rgba(167, 139, 250, 0.8)',
+            'rgba(244, 114, 182, 0.8)',
+            'rgba(56, 189, 248, 0.8)',
+          ] : [
+            'rgba(59, 130, 246, 0.8)',
+            'rgba(16, 185, 129, 0.8)',
+            'rgba(245, 158, 11, 0.8)',
+            'rgba(239, 68, 68, 0.8)',
+            'rgba(139, 92, 246, 0.8)',
+            'rgba(236, 72, 153, 0.8)',
+            'rgba(14, 165, 233, 0.8)',
+          ],
+          borderRadius: 8,
+        },
+      ],
+    };
+  };
+
+  // Build revenue trend data from real order data
+  const buildRevenueTrendData = (orders = [], darkMode = false) => {
+    console.log('🚀 buildRevenueTrendData called with', orders.length, 'orders');
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Get current month and 5 months before it (6 months total)
+    const last6Months = [];
+    for (let i = 5; i >= 0; i--) {
+      let monthIndex = currentMonth - i;
+      let monthYear = currentYear;
+      
+      // Handle year boundary (e.g., if current month is Jan, we need Dec from previous year)
+      if (monthIndex < 0) {
+        monthIndex += 12;
+        monthYear -= 1;
+      }
+      
+      last6Months.push({
+        month: monthIndex,
+        monthName: months[monthIndex],
+        year: monthYear,
+        revenue: 0
+      });
+    }
+    
+    // Debug: Let's see what we're actually getting
+    console.log('Debug - Current month:', currentMonth, '(', months[currentMonth], ')');
+    console.log('Debug - 6 months array:', last6Months.map(m => `${m.monthName} (${m.month})`));
+    console.log('Debug - Date now:', now.toDateString());
+    console.log('Debug - Month calculation:', `currentMonth(${currentMonth}) - i(5,4,3,2,1,0) = [${[5,4,3,2,1,0].map(i => currentMonth - i).join(', ')}]`);
+    
+    // Expected: If current month is Aug (7), we should get: Mar(2), Apr(3), May(4), Jun(5), Jul(6), Aug(7)
+    // But if we're getting Jun as last, something is wrong with the calculation
+    
+    // Calculate revenue for each month
+    console.log('🔍 Processing orders for revenue calculation...');
+    let processedOrders = 0;
+    
+    orders.forEach(order => {
+      const orderDate = new Date(order.created_at || order.order_date);
+      const orderMonth = orderDate.getMonth();
+      const orderYear = orderDate.getFullYear();
+      
+      // Debug: Log some sample order dates
+      if (processedOrders < 5) {
+        console.log(`  Order ${order.id}: date=${orderDate.toDateString()}, month=${orderMonth} (${months[orderMonth]}), year=${orderYear}, amount=${order.total_amount}`);
+      }
+      
+      // Find matching month and year
+      const monthData = last6Months.find(m => m.month === orderMonth && m.year === orderYear);
+      if (monthData) {
+        monthData.revenue += parseFloat(order.total_amount || 0);
+        processedOrders++;
+      } else {
+        console.log(`  ⚠️ Order ${order.id} date ${orderDate.toDateString()} didn't match any month in range`);
+      }
+    });
+    
+    console.log(`✅ Processed ${processedOrders} orders for revenue calculation`);
+    
+    return {
+      labels: last6Months.map(m => m.monthName),
+      datasets: [
+        {
+          label: 'Revenue',
+          data: last6Months.map(m => m.revenue),
+          borderColor: darkMode ? 'rgb(96, 165, 250)' : 'rgb(59, 130, 246)',
+          backgroundColor: darkMode ? 'rgba(96, 165, 250, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+          fill: true,
+          tension: 0.4,
+        },
+      ],
+    };
+  };
+
   const getStatusBadge = (status) => {
     const statusConfig = {
       'pending': { variant: 'secondary', text: 'Pending', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
@@ -120,68 +422,40 @@ export default function Dashboard() {
     return <Badge className={config.color}>{config.text}</Badge>;
   };
 
-  // Chart data with dark mode support
-  const salesData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+  // Use dynamic chart data or minimal fallbacks
+  const categoryData = categoryChartData || {
+    labels: ['No data'],
     datasets: [
       {
-        label: 'Revenue',
-        data: [12000, 19000, 15000, 25000, 22000, 30000],
-        borderColor: isDarkMode ? 'rgb(96, 165, 250)' : 'rgb(59, 130, 246)',
-        backgroundColor: isDarkMode ? 'rgba(96, 165, 250, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-        fill: true,
-        tension: 0.4,
+        data: [1],
+        backgroundColor: [isDarkMode ? '#334155' : '#e5e7eb'],
+        borderWidth: 0,
       },
     ],
   };
 
-  const orderData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  const weeklyData = weeklyOrdersData || {
+    labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     datasets: [
       {
         label: 'Orders',
-        data: [65, 59, 80, 81, 56, 55, 40],
-        backgroundColor: isDarkMode ? [
-          'rgba(96, 165, 250, 0.8)',
-          'rgba(52, 211, 153, 0.8)',
-          'rgba(251, 191, 36, 0.8)',
-          'rgba(248, 113, 113, 0.8)',
-          'rgba(167, 139, 250, 0.8)',
-          'rgba(244, 114, 182, 0.8)',
-          'rgba(56, 189, 248, 0.8)',
-        ] : [
-          'rgba(59, 130, 246, 0.8)',
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(245, 158, 11, 0.8)',
-          'rgba(239, 68, 68, 0.8)',
-          'rgba(139, 92, 246, 0.8)',
-          'rgba(236, 72, 153, 0.8)',
-          'rgba(14, 165, 233, 0.8)',
-        ],
+        data: [0, 0, 0, 0, 0, 0, 0],
+        backgroundColor: isDarkMode ? 'rgba(96, 165, 250, 0.8)' : 'rgba(59, 130, 246, 0.8)',
         borderRadius: 8,
       },
     ],
   };
 
-  const categoryData = {
-    labels: ['Pizzas', 'Drinks', 'Desserts', 'Sides', 'Salads'],
+  const revenueData = revenueTrendData || {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
     datasets: [
       {
-        data: [45, 25, 15, 10, 5],
-        backgroundColor: isDarkMode ? [
-          '#60A5FA',
-          '#34D399',
-          '#FBBF24',
-          '#F87171',
-          '#A78BFA',
-        ] : [
-          '#3B82F6',
-          '#10B981',
-          '#F59E0B',
-          '#EF4444',
-          '#8B5CF6',
-        ],
-        borderWidth: 0,
+        label: 'Revenue',
+        data: [0, 0, 0, 0, 0, 0],
+        borderColor: isDarkMode ? 'rgb(96, 165, 250)' : 'rgb(59, 130, 246)',
+        backgroundColor: isDarkMode ? 'rgba(96, 165, 250, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+        fill: true,
+        tension: 0.4,
       },
     ],
   };
@@ -245,9 +519,22 @@ export default function Dashboard() {
             <CardContent>
               <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">{stats.totalOrders}</div>
               <div className="flex items-center mt-2">
-                <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600 dark:text-green-400 font-medium">+20.1%</span>
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">from last month</span>
+                {(() => {
+                  const monthStats = getMonthOverMonthStats(recentOrders);
+                  const ArrowIcon = monthStats.ordersDirection === 'up' ? ArrowUp : ArrowDown;
+                  const colorClass = monthStats.ordersDirection === 'up' ? 'text-green-500' : 'text-red-500';
+                  const textColorClass = monthStats.ordersDirection === 'up' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+                  
+                  return (
+                    <>
+                      <ArrowIcon className={`h-4 w-4 ${colorClass} mr-1`} />
+                      <span className={`text-sm font-medium ${textColorClass}`}>
+                        {monthStats.ordersDirection === 'up' ? '+' : ''}{monthStats.ordersChange}%
+                      </span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">from last month</span>
+                    </>
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -264,9 +551,22 @@ export default function Dashboard() {
             <CardContent>
               <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(stats.totalRevenue)}</div>
               <div className="flex items-center mt-2">
-                <ArrowUp className="h-4 w-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600 dark:text-green-400 font-medium">+10.5%</span>
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">from last month</span>
+                {(() => {
+                  const monthStats = getMonthOverMonthStats(recentOrders);
+                  const ArrowIcon = monthStats.revenueDirection === 'up' ? ArrowUp : ArrowDown;
+                  const colorClass = monthStats.revenueDirection === 'up' ? 'text-green-500' : 'text-red-500';
+                  const textColorClass = monthStats.revenueDirection === 'up' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+                  
+                  return (
+                    <>
+                      <ArrowIcon className={`h-4 w-4 ${colorClass} mr-1`} />
+                      <span className={`text-sm font-medium ${textColorClass}`}>
+                        {monthStats.revenueDirection === 'up' ? '+' : ''}{monthStats.revenueChange}%
+                      </span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">from last month</span>
+                    </>
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -316,11 +616,11 @@ export default function Dashboard() {
           <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl">
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-gray-800 dark:text-gray-200">Revenue Trend</CardTitle>
-              <CardDescription className="dark:text-gray-400">Monthly revenue performance over the last 6 months</CardDescription>
+              <CardDescription className="dark:text-gray-400">Monthly revenue performance based on your actual order data</CardDescription>
             </CardHeader>
             <CardContent>
               <Line 
-                data={salesData} 
+                data={revenueData} 
                 options={{
                   responsive: true,
                   plugins: {
@@ -356,11 +656,11 @@ export default function Dashboard() {
           <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl">
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-gray-800 dark:text-gray-200">Weekly Orders</CardTitle>
-              <CardDescription className="dark:text-gray-400">Daily order volume for the current week</CardDescription>
+              <CardDescription className="dark:text-gray-400">Daily order volume for the current week based on your actual orders</CardDescription>
             </CardHeader>
             <CardContent>
               <Bar 
-                data={orderData} 
+                data={weeklyData} 
                 options={{
                   responsive: true,
                   plugins: {
