@@ -5,6 +5,7 @@ import ToastContainer from './ToastContainer';
 import { 
   LayoutDashboard,
   Package,
+  Tag,
   Users,
   ShoppingCart,
   BarChart3,
@@ -20,8 +21,9 @@ export default function Navigation() {
   const navigationItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Products', href: '/products', icon: Package },
-    { name: 'Customers', href: '/customers', icon: Users },
+    { name: 'Categories', href: '/categories', icon: Tag },
     { name: 'Orders', href: '/orders', icon: ShoppingCart },
+    { name: 'Customers', href: '/customers', icon: Users },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];

@@ -107,6 +107,143 @@ router.get("/:id/items", async (req, res) => {
   }
 });
 
+// Create new order
+router.post("/", async (req, res) => {
+  try {
+    const { user_id, total_amount, status = 'pending', items } = req.body;
+    
+    if (!user_id || !total_amount || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: user_id, total_amount, and items array are required"
+      });
+    }
+
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Create order
+      const orderResult = await client.query(`
+        INSERT INTO orders (user_id, total_amount, status, created_at, updated_at)
+        VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        RETURNING id
+      `, [user_id, total_amount, status]);
+      
+      const orderId = orderResult.rows[0].id;
+      
+      // Create order items
+      for (const item of items) {
+        if (!item.product_id || !item.quantity || !item.price) {
+          throw new Error(`Invalid item data: product_id, quantity, and price are required`);
+        }
+        
+        await client.query(`
+          INSERT INTO order_items (order_id, product_id, quantity, price)
+          VALUES ($1, $2, $3, $4)
+        `, [orderId, item.product_id, item.quantity, item.price]);
+      }
+      
+      await client.query('COMMIT');
+      
+      res.status(201).json({
+        success: true,
+        data: { id: orderId },
+        message: "Order created successfully"
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Order creation error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to create order",
+      message: error.message
+    });
+  }
+});
+
+// Update order
+router.put("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { user_id, total_amount, status, items } = req.body;
+    
+    if (!user_id || !total_amount || !status) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: user_id, total_amount, and status are required"
+      });
+    }
+
+    // Check if order exists
+    const orderCheck = await pool.query('SELECT id FROM orders WHERE id = $1', [id]);
+    if (orderCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Order not found"
+      });
+    }
+
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Update order
+      const orderResult = await client.query(`
+        UPDATE orders 
+        SET user_id = $1, total_amount = $2, status = $3, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $4
+        RETURNING *
+      `, [user_id, total_amount, status, id]);
+      
+      // If items are provided, update them
+      if (items && Array.isArray(items)) {
+        // Delete existing items
+        await client.query('DELETE FROM order_items WHERE order_id = $1', [id]);
+        
+        // Insert new items
+        for (const item of items) {
+          if (!item.product_id || !item.quantity || !item.price) {
+            throw new Error(`Invalid item data: product_id, quantity, and price are required`);
+          }
+          
+          await client.query(`
+            INSERT INTO order_items (order_id, product_id, quantity, price)
+            VALUES ($1, $2, $3, $4)
+          `, [id, item.product_id, item.quantity, item.price]);
+        }
+      }
+      
+      await client.query('COMMIT');
+      
+      res.json({
+        success: true,
+        data: orderResult.rows[0],
+        message: "Order updated successfully"
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Order update error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update order",
+      message: error.message
+    });
+  }
+});
+
 // Update order status
 router.put("/:id/status", async (req, res) => {
   try {
@@ -137,6 +274,53 @@ router.put("/:id/status", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to update order status",
+      message: error.message
+    });
+  }
+});
+
+// Delete order
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if order exists
+    const orderCheck = await pool.query('SELECT id FROM orders WHERE id = $1', [id]);
+    if (orderCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Order not found"
+      });
+    }
+
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Delete order items first (due to foreign key constraint)
+      await client.query('DELETE FROM order_items WHERE order_id = $1', [id]);
+      
+      // Delete order
+      await client.query('DELETE FROM orders WHERE id = $1', [id]);
+      
+      await client.query('COMMIT');
+      
+      res.json({
+        success: true,
+        message: "Order deleted successfully"
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Order deletion error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete order",
       message: error.message
     });
   }

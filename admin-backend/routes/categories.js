@@ -137,4 +137,143 @@ router.get("/:id/stats", async (req, res) => {
   }
 });
 
+// Create new category (POST)
+router.post("/", async (req, res) => {
+  try {
+    const { name, description, display_order, is_active } = req.body;
+    
+    // Validate required fields
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required field: name is required"
+      });
+    }
+
+    // Check if category name already exists
+    const existingCheck = await pool.query("SELECT id FROM categories WHERE name = $1", [name]);
+    if (existingCheck.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Category name already exists"
+      });
+    }
+
+    // Insert new category
+    const { rows } = await pool.query(`
+      INSERT INTO categories (name, description, display_order, is_active, created_at)
+      VALUES ($1, $2, $3, $4, NOW())
+      RETURNING id, name, description, display_order, is_active, created_at
+    `, [name, description || null, display_order || 0, is_active !== false]);
+
+    res.status(201).json({
+      success: true,
+      data: rows[0],
+      message: "Category created successfully"
+    });
+  } catch (error) {
+    console.error("Category creation error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to create category",
+      message: error.message
+    });
+  }
+});
+
+// Update category (PUT)
+router.put("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, display_order, is_active } = req.body;
+    
+    // Check if category exists
+    const categoryCheck = await pool.query("SELECT id FROM categories WHERE id = $1", [id]);
+    if (categoryCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Category not found"
+      });
+    }
+
+    // Validate required fields
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required field: name is required"
+      });
+    }
+
+    // Check if category name already exists (excluding current category)
+    const existingCheck = await pool.query("SELECT id FROM categories WHERE name = $1 AND id != $2", [name, id]);
+    if (existingCheck.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Category name already exists"
+      });
+    }
+
+    // Update category
+    const { rows } = await pool.query(`
+      UPDATE categories 
+      SET name = $1, description = $2, display_order = $3, is_active = $4
+      WHERE id = $5
+      RETURNING id, name, description, display_order, is_active, created_at
+    `, [name, description || null, display_order || 0, is_active !== false, id]);
+
+    res.json({
+      success: true,
+      data: rows[0],
+      message: "Category updated successfully"
+    });
+  } catch (error) {
+    console.error("Category update error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update category",
+      message: error.message
+    });
+  }
+});
+
+// Delete category (DELETE)
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if category exists
+    const categoryCheck = await pool.query("SELECT id, name FROM categories WHERE id = $1", [id]);
+    if (categoryCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Category not found"
+      });
+    }
+
+    // Check if category has products
+    const productsCheck = await pool.query("SELECT COUNT(*) as count FROM products WHERE category_id = $1", [id]);
+    if (parseInt(productsCheck.rows[0].count) > 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Cannot delete category: it contains products. Please move or delete all products first."
+      });
+    }
+
+    // Delete category
+    await pool.query("DELETE FROM categories WHERE id = $1", [id]);
+
+    res.json({
+      success: true,
+      message: `Category "${categoryCheck.rows[0].name}" deleted successfully`
+    });
+  } catch (error) {
+    console.error("Category deletion error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete category",
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
