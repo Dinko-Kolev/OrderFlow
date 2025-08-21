@@ -90,3 +90,8 @@
 .dark .hover\:bg-gray-50\/50:hover {
   background-color: rgba(51, 65, 85, 0.5);
 }
+
+/* Custom topbar padding */
+.topbar-padding {
+  padding-top: 24px !important;
+}

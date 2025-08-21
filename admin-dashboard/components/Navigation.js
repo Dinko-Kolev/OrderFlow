@@ -11,7 +11,10 @@ import {
   BarChart3,
   Settings,
   Sun,
-  Moon
+  Moon,
+  Table,
+  Calendar,
+  CalendarIcon
 } from 'lucide-react';
 
 export default function Navigation() {
@@ -24,6 +27,9 @@ export default function Navigation() {
     { name: 'Categories', href: '/categories', icon: Tag },
     { name: 'Orders', href: '/orders', icon: ShoppingCart },
     { name: 'Customers', href: '/customers', icon: Users },
+    { name: 'Tables', href: '/tables', icon: Table },
+    { name: 'Reservations', href: '/reservations', icon: Calendar },
+    { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];

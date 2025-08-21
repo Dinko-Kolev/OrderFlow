@@ -8,6 +8,7 @@ router.use("/customers", require("./customers"));
 router.use("/categories", require("./categories"));
 router.use("/dashboard", require("./dashboard"));
 router.use("/tables", require("./tables"));
+router.use("/reservations", require("./reservations"));
 router.use("/inventory", require("./inventory"));
 
 // Legacy endpoints for backward compatibility
