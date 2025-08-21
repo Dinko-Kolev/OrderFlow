@@ -2,9 +2,13 @@ import { useState, useCallback } from 'react';
 import Toast from './Toast';
 
 const ToastContainer = () => {
+  console.log('🍞 ToastContainer component rendered');
+  
   const [toasts, setToasts] = useState([]);
 
   const addToast = useCallback((message, type = 'info', duration = 4000) => {
+    console.log('🍞 Adding toast:', { message, type, duration });
+    
     const id = Date.now() + Math.random();
     const newToast = { id, message, type, duration };
     
@@ -17,12 +21,15 @@ const ToastContainer = () => {
   }, []);
 
   const removeToast = useCallback((id) => {
+    console.log('🍞 Removing toast:', id);
     setToasts(prev => prev.filter(toast => toast.id !== id));
   }, []);
 
   // Expose addToast method globally
   if (typeof window !== 'undefined') {
+    console.log('🍞 Setting window.showToast');
     window.showToast = addToast;
+    console.log('🍞 window.showToast available:', typeof window.showToast);
   }
 
   return (
