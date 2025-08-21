@@ -70,12 +70,13 @@ export default function NewReservationModal({ isOpen, onClose, onSubmit, tables 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="customer_phone">Phone</Label>
+                <Label htmlFor="customer_phone">Phone *</Label>
                 <Input
                   id="customer_phone"
                   value={formData.customer_phone}
                   onChange={(e) => handleChange('customer_phone', e.target.value)}
                   placeholder="+1 (555) 123-4567"
+                  required
                 />
               </div>
               <div>

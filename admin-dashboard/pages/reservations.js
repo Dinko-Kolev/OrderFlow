@@ -28,7 +28,8 @@ import {
   Settings,
   Building2,
   Save,
-  RotateCcw
+  RotateCcw,
+  MapPin
 } from 'lucide-react';
 
 export default function Reservations() {
