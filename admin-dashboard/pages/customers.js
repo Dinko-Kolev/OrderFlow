@@ -13,19 +13,21 @@ import {
   Phone,
   MapPin,
   Calendar,
-  DollarSign,
+  Euro,
   ShoppingCart
 } from 'lucide-react';
 
 export default function Customers() {
   const { isDarkMode } = useTheme();
   const [customers, setCustomers] = useState([]);
+  const [allCustomers, setAllCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [displayLimit, setDisplayLimit] = useState(100);
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [displayLimit]);
 
   const fetchCustomers = async () => {
     try {
@@ -33,7 +35,10 @@ export default function Customers() {
       const data = await response.json();
       
       if (data.success) {
-        setCustomers(data.data || []);
+        setAllCustomers(data.data || []);
+        // Show first 100 customers initially
+        const customersToShow = (data.data || []).slice(0, displayLimit);
+        setCustomers(customersToShow);
       }
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -44,10 +49,10 @@ export default function Customers() {
   };
 
   const formatCurrency = (amount) => {
-    if (!amount) return '$0.00';
+    if (!amount) return '€0.00';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'EUR'
     }).format(amount);
   };
 
@@ -58,6 +63,19 @@ export default function Customers() {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const handleShowMoreCustomers = () => {
+    const newLimit = Math.min(displayLimit + 100, allCustomers.length);
+    setDisplayLimit(newLimit);
+    const customersToShow = allCustomers.slice(0, newLimit);
+    setCustomers(customersToShow);
+  };
+
+  const handleShowLessCustomers = () => {
+    setDisplayLimit(100);
+    const customersToShow = allCustomers.slice(0, 100);
+    setCustomers(customersToShow);
   };
 
   // Filter customers based on search

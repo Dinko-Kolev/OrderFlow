@@ -14,14 +14,14 @@ router.get("/", async (req, res) => {
         u.last_name,
         o.total_amount, 
         o.status, 
-        o.created_at,
+        o.order_date as created_at,
         COUNT(oi.id) as item_count
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
-      GROUP BY o.id, o.user_id, u.email, u.first_name, u.last_name, o.total_amount, o.status, o.created_at
-      ORDER BY o.created_at DESC 
-      LIMIT 100
+      GROUP BY o.id, o.user_id, u.email, u.first_name, u.last_name, o.total_amount, o.status, o.order_date
+      ORDER BY o.order_date DESC 
+      LIMIT 3500
     `);
     
     res.json({

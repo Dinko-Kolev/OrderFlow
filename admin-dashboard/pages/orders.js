@@ -18,7 +18,7 @@ import {
   Filter,
   ArrowUpDown,
   Calendar,
-  DollarSign,
+  Euro,
   User,
   Package,
   Clock,
@@ -27,6 +27,7 @@ import {
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('created_at');
@@ -42,12 +43,13 @@ export default function Orders() {
   });
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [displayLimit, setDisplayLimit] = useState(100);
 
   useEffect(() => {
     fetchOrders();
     fetchCustomers();
     fetchProducts();
-  }, []);
+  }, [displayLimit]);
 
   useEffect(() => {
     if (window.showToast) {
@@ -61,9 +63,12 @@ export default function Orders() {
       const data = await response.json();
       
       if (data.success) {
-        setOrders(data.data);
+        setAllOrders(data.data);
+        // Show first 100 orders initially
+        const ordersToShow = data.data.slice(0, displayLimit);
+        setOrders(ordersToShow);
         if (window.showToast) {
-          window.showToast(`Loaded ${data.data.length} orders`, 'info');
+          window.showToast(`Loaded ${data.data.length} orders (showing ${ordersToShow.length})`, 'info');
         }
       } else {
         if (window.showToast) {
@@ -107,7 +112,7 @@ export default function Orders() {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'EUR'
     }).format(amount);
   };
 
@@ -230,6 +235,25 @@ export default function Orders() {
     setModalType('delete');
     setSelectedOrder(order);
     setShowModal(true);
+  };
+
+  const handleShowMoreOrders = () => {
+    const newLimit = Math.min(displayLimit + 50, allOrders.length);
+    setDisplayLimit(newLimit);
+    const ordersToShow = allOrders.slice(0, newLimit);
+    setOrders(ordersToShow);
+    if (window.showToast) {
+      window.showToast(`Now showing ${ordersToShow.length} orders`, 'info');
+    }
+  };
+
+  const handleShowLessOrders = () => {
+    setDisplayLimit(100);
+    const ordersToShow = allOrders.slice(0, 100);
+    setOrders(ordersToShow);
+    if (window.showToast) {
+      window.showToast(`Now showing ${ordersToShow.length} orders`, 'info');
+    }
   };
 
   const handleCloseModal = () => {
@@ -386,7 +410,7 @@ export default function Orders() {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                  <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  <Euro className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
@@ -595,6 +619,36 @@ export default function Orders() {
                 )}
               </TableBody>
             </Table>
+            
+            {/* Incremental Loading Controls */}
+            {allOrders.length > 0 && (
+              <div className="mt-6 text-center space-y-3 border-t border-gray-200 dark:border-slate-700 pt-6">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Showing {orders.length} of {allOrders.length} orders
+                </div>
+                <div className="space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-blue-200 dark:border-blue-600 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    onClick={handleShowMoreOrders}
+                    disabled={displayLimit >= allOrders.length}
+                  >
+                    Show 50 More Orders
+                  </Button>
+                  {displayLimit > 100 && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900/20"
+                      onClick={handleShowLessOrders}
+                    >
+                      Show Less
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

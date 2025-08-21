@@ -134,6 +134,156 @@ router.get("/recent-activity", async (req, res) => {
   }
 });
 
+// Get current month revenue
+router.get("/current-month-revenue", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT COALESCE(SUM(total_amount), 0) as revenue
+      FROM orders 
+      WHERE status != 'cancelled' 
+      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+    `);
+    
+    res.json({
+      success: true,
+      data: parseFloat(rows[0].revenue) || 0,
+      message: "Current month revenue retrieved successfully"
+    });
+  } catch (error) {
+    console.error("Current month revenue error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to retrieve current month revenue",
+      message: error.message
+    });
+  }
+});
+
+// Get previous month revenue
+router.get("/previous-month-revenue", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT COALESCE(SUM(total_amount), 0) as revenue
+      FROM orders 
+      WHERE status != 'cancelled' 
+      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+    `);
+    
+    res.json({
+      success: true,
+      data: parseFloat(rows[0].revenue) || 0,
+      message: "Previous month revenue retrieved successfully"
+    });
+  } catch (error) {
+    console.error("Previous month revenue error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to retrieve previous month revenue",
+      message: error.message
+    });
+  }
+});
+
+// Get current month orders
+router.get("/current-month-orders", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT COUNT(*) as orders
+      FROM orders 
+      WHERE status != 'cancelled' 
+      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+    `);
+    
+    res.json({
+      success: true,
+      data: parseInt(rows[0].orders) || 0,
+      message: "Current month orders retrieved successfully"
+    });
+  } catch (error) {
+    console.error("Current month orders error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to retrieve current month orders",
+      message: error.message
+    });
+  }
+});
+
+// Get previous month orders
+router.get("/previous-month-orders", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT COUNT(*) as orders
+      FROM orders 
+      WHERE status != 'cancelled' 
+      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+    `);
+    
+    res.json({
+      success: true,
+      data: parseInt(rows[0].orders) || 0,
+      message: "Previous month orders retrieved successfully"
+    });
+  } catch (error) {
+    console.error("Previous month orders error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to retrieve previous month orders",
+      message: error.message
+    });
+  }
+});
+
+// Get current month customers
+router.get("/current-month-customers", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT COUNT(DISTINCT user_id) as customers
+      FROM orders 
+      WHERE status != 'cancelled' 
+      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+    `);
+    
+    res.json({
+      success: true,
+      data: parseInt(rows[0].customers) || 0,
+      message: "Current month customers retrieved successfully"
+    });
+  } catch (error) {
+    console.error("Current month customers error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to retrieve current month customers",
+      message: error.message
+    });
+  }
+});
+
+// Get previous month customers
+router.get("/previous-month-customers", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT COUNT(DISTINCT user_id) as customers
+      FROM orders 
+      WHERE status != 'cancelled' 
+      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+    `);
+    
+    res.json({
+      success: true,
+      data: parseInt(rows[0].customers) || 0,
+      message: "Previous month customers retrieved successfully"
+    });
+  } catch (error) {
+    console.error("Previous month customers error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to retrieve previous month customers",
+      message: error.message
+    });
+  }
+});
+
 // Dashboard statistics function
 async function getDashboardStats() {
   try {

@@ -28,7 +28,11 @@ pool.query("SELECT NOW()", (err, res) => {
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.ADMIN_FRONTEND_URL || "http://localhost:3002",
+  origin: [
+    process.env.ADMIN_FRONTEND_URL || "http://localhost:3002",
+    "http://localhost:3000",
+    "http://localhost:3001"
+  ],
   credentials: true
 }));
 
