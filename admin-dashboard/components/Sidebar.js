@@ -121,6 +121,12 @@ export default function Sidebar({ isOpen, onToggle }) {
           href: '/settings',
           icon: Settings,
           badge: null
+        },
+        {
+          name: 'Restaurant Settings',
+          href: '/restaurant-settings',
+          icon: Building2,
+          badge: null
         }
       ]
     }

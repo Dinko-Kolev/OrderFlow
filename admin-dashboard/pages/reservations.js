@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTheme } from '../contexts/ThemeContext';
 import Layout from '../components/Layout';
+import NewReservationModal from '../components/NewReservationModal';
+import EditReservationModal from '../components/EditReservationModal';
 import { 
   Calendar,
   Clock,
   Users,
-  MapPin,
   Phone,
   Mail,
   Search,
@@ -23,7 +24,11 @@ import {
   Plus,
   AlertCircle,
   CheckCircle,
-  XCircle
+  XCircle,
+  Settings,
+  Building2,
+  Save,
+  RotateCcw
 } from 'lucide-react';
 
 export default function Reservations() {
@@ -37,6 +42,14 @@ export default function Reservations() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalReservations, setTotalReservations] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [restaurantConfig, setRestaurantConfig] = useState({});
+  const [workingHours, setWorkingHours] = useState([]);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [showNewReservationModal, setShowNewReservationModal] = useState(false);
+  const [showEditReservationModal, setShowEditReservationModal] = useState(false);
+  const [editingReservation, setEditingReservation] = useState(null);
+  const [tables, setTables] = useState([]);
 
   const fetchReservations = async (page = 1) => {
     try {
@@ -81,7 +94,205 @@ export default function Reservations() {
 
   useEffect(() => {
     fetchReservations(1);
+    fetchRestaurantConfig();
+    fetchTables();
   }, [searchTerm, statusFilter, dateFilter]);
+
+  const fetchTables = async () => {
+    try {
+      const response = await fetch('http://localhost:3003/api/admin/tables');
+      const data = await response.json();
+      if (data.success) {
+        setTables(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching tables:', error);
+    }
+  };
+
+  const fetchRestaurantConfig = async () => {
+    try {
+      // Fetch restaurant configuration
+      const configResponse = await fetch('http://localhost:3003/api/admin/restaurant/config');
+      const configData = await configResponse.json();
+      if (configData.success) {
+        setRestaurantConfig(configData.data);
+      }
+
+      // Fetch working hours
+      const hoursResponse = await fetch('http://localhost:3003/api/admin/restaurant/working-hours');
+      const hoursData = await hoursResponse.json();
+      if (hoursData.success) {
+        setWorkingHours(hoursData.data);
+      }
+    } catch (error) {
+      console.error('Error fetching restaurant config:', error);
+    }
+  };
+
+
+
+  const handleCreateReservation = async (reservationData) => {
+    try {
+      const response = await fetch('http://localhost:3003/api/admin/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reservationData)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        if (window.showToast) {
+          window.showToast('Reservation created successfully', 'success', 2000);
+        }
+        setShowNewReservationModal(false);
+        fetchReservations(currentPage);
+      } else {
+        throw new Error(data.error || 'Failed to create reservation');
+      }
+    } catch (error) {
+      console.error('Error creating reservation:', error);
+      if (window.showToast) {
+        window.showToast('Failed to create reservation', 'error', 4000);
+      }
+    }
+  };
+
+  const handleUpdateReservation = async (reservationId, updates) => {
+    try {
+      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        if (window.showToast) {
+          window.showToast('Reservation updated successfully', 'success', 2000);
+        }
+        setShowEditReservationModal(false);
+        setEditingReservation(null);
+        fetchReservations(currentPage);
+      } else {
+        throw new Error(data.error || 'Failed to update reservation');
+      }
+    } catch (error) {
+      console.error('Error updating reservation:', error);
+      if (window.showToast) {
+        window.showToast('Failed to update reservation', 'error', 4000);
+      }
+    }
+  };
+
+
+
+
+
+
+
+  const updateRestaurantConfig = async (key, value) => {
+    try {
+      const response = await fetch('http://localhost:3003/api/admin/restaurant/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_key: key, config_value: value })
+      });
+      
+      if (response.ok) {
+        if (window.showToast) {
+          window.showToast('Configuration updated successfully', 'success', 2000);
+        }
+        fetchRestaurantConfig(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Error updating configuration:', error);
+      if (window.showToast) {
+        window.showToast('Failed to update configuration', 'error', 4000);
+      }
+    }
+  };
+
+  const resetToDefaults = async () => {
+    try {
+      setSavingConfig(true);
+      const response = await fetch('http://localhost:3003/api/admin/restaurant/reset-defaults', {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        if (window.showToast) {
+          window.showToast('Configuration reset to defaults', 'success', 3000);
+        }
+        fetchRestaurantConfig(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Error resetting configuration:', error);
+      if (window.showToast) {
+        window.showToast('Failed to reset configuration', 'error', 4000);
+      }
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleStatusUpdate = async (reservationId, newStatus) => {
+    try {
+      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (response.ok) {
+        if (window.showToast) {
+          window.showToast(`Reservation status updated to ${newStatus}`, 'success', 2000);
+        }
+        fetchReservations(currentPage); // Refresh the list
+      } else {
+        throw new Error('Failed to update status');
+      }
+    } catch (error) {
+      console.error('Error updating reservation status:', error);
+      if (window.showToast) {
+        window.showToast('Failed to update reservation status', 'error', 4000);
+      }
+    }
+  };
+
+  const handleDeleteReservation = async (reservationId) => {
+    if (!confirm('Are you sure you want to delete this reservation? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        if (window.showToast) {
+          window.showToast('Reservation deleted successfully', 'success', 2000);
+        }
+        fetchReservations(currentPage); // Refresh the list
+      } else {
+        throw new Error('Failed to delete reservation');
+      }
+    } catch (error) {
+      console.error('Error deleting reservation:', error);
+      if (window.showToast) {
+        window.showToast('Failed to delete reservation', 'error', 4000);
+      }
+    }
+  };
+
+  const handleViewReservation = (reservation) => {
+    // For now, just show details in console. Could be expanded to a modal
+    console.log('Viewing reservation:', reservation);
+    if (window.showToast) {
+      window.showToast(`Viewing reservation for ${reservation.customer_name}`, 'info', 2000);
+    }
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -148,63 +359,9 @@ export default function Reservations() {
     return timeString.substring(0, 5); // Format HH:MM
   };
 
-  const handleStatusUpdate = async (reservationId, newStatus) => {
-    try {
-      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
 
-      const data = await response.json();
 
-      if (data.success) {
-        if (window.showToast) {
-          window.showToast(`Reservation status updated to ${newStatus}`, 'success', 2000);
-        }
-        // Refresh the list
-        fetchReservations(currentPage);
-      } else {
-        throw new Error(data.error || 'Failed to update reservation');
-      }
-    } catch (err) {
-      console.error('Status update error:', err);
-      if (window.showToast) {
-        window.showToast('Failed to update reservation status', 'error', 4000);
-      }
-    }
-  };
 
-  const handleDeleteReservation = async (reservationId) => {
-    if (!confirm('Are you sure you want to delete this reservation? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}`, {
-        method: 'DELETE'
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        if (window.showToast) {
-          window.showToast('Reservation deleted successfully', 'success', 2000);
-        }
-        // Refresh the list
-        fetchReservations(currentPage);
-      } else {
-        throw new Error(data.error || 'Failed to delete reservation');
-      }
-    } catch (err) {
-      console.error('Delete error:', err);
-      if (window.showToast) {
-        window.showToast('Failed to delete reservation', 'error', 4000);
-      }
-    }
-  };
 
   if (loading && reservations.length === 0) {
     return (
@@ -246,7 +403,10 @@ export default function Reservations() {
                   <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                   {loading ? 'Refreshing...' : 'Refresh'}
                 </Button>
-                <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 dark:from-green-500 dark:to-emerald-500 dark:hover:from-green-600 dark:hover:to-emerald-600 text-white shadow-lg">
+                <Button 
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 dark:from-green-500 dark:to-emerald-500 dark:hover:from-green-600 dark:hover:to-emerald-600 text-white shadow-lg"
+                  onClick={() => setShowNewReservationModal(true)}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   New Reservation
                 </Button>
@@ -401,6 +561,258 @@ export default function Reservations() {
             </CardContent>
           </Card>
 
+          {/* Reservation Settings Section */}
+          <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Settings className="h-5 w-5 text-blue-600" />
+                  <CardTitle>Reservation Settings</CardTitle>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSettings(!showSettings)}
+                    className="border-blue-200 dark:border-blue-600 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                  >
+                    {showSettings ? 'Hide Settings' : 'Show Settings'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetToDefaults}
+                    disabled={savingConfig}
+                    className="border-orange-200 dark:border-orange-600 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset to Defaults
+                  </Button>
+                </div>
+              </div>
+              <CardDescription>
+                Configure reservation duration, time slots, and operational settings
+              </CardDescription>
+            </CardHeader>
+            {showSettings && (
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Duration Settings */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      Duration Settings
+                    </h3>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Reservation Duration (minutes)
+                      </label>
+                      <Input
+                        type="number"
+                        value={restaurantConfig.reservation_duration_minutes || ''}
+                        onChange={(e) => updateRestaurantConfig('reservation_duration_minutes', e.target.value)}
+                        placeholder="105"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Total time including dining and buffer
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Grace Period (minutes)
+                      </label>
+                      <Input
+                        type="number"
+                        value={restaurantConfig.grace_period_minutes || ''}
+                        onChange={(e) => updateRestaurantConfig('grace_period_minutes', e.target.value)}
+                        placeholder="15"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Late arrival tolerance
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Max Sitting Time (minutes)
+                      </label>
+                      <Input
+                        type="number"
+                        value={restaurantConfig.max_sitting_minutes || ''}
+                        onChange={(e) => updateRestaurantConfig('max_sitting_minutes', e.target.value)}
+                        placeholder="120"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Maximum time at table
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Time Slot Settings */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-green-600" />
+                      Time Slot Settings
+                    </h3>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Time Slot Interval (minutes)
+                      </label>
+                      <Input
+                        type="number"
+                        value={restaurantConfig.time_slot_interval_minutes || ''}
+                        onChange={(e) => updateRestaurantConfig('time_slot_interval_minutes', e.target.value)}
+                        placeholder="30"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Interval between available times
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Lunch Buffer (minutes)
+                      </label>
+                      <Input
+                        type="number"
+                        value={restaurantConfig.lunch_buffer_minutes || ''}
+                        onChange={(e) => updateRestaurantConfig('lunch_buffer_minutes', e.target.value)}
+                        placeholder="15"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Buffer between lunch reservations
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Dinner Buffer (minutes)
+                      </label>
+                      <Input
+                        type="number"
+                        value={restaurantConfig.dinner_buffer_minutes || ''}
+                        onChange={(e) => updateRestaurantConfig('dinner_buffer_minutes', e.target.value)}
+                        placeholder="15"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Buffer between dinner reservations
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Booking Settings */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-purple-600" />
+                      Booking Settings
+                    </h3>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Advance Booking (days)
+                      </label>
+                      <Input
+                        type="number"
+                        value={restaurantConfig.advance_booking_days || ''}
+                        onChange={(e) => updateRestaurantConfig('advance_booking_days', e.target.value)}
+                        placeholder="30"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Days in advance customers can book
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Same Day Booking (hours)
+                      </label>
+                      <Input
+                        type="number"
+                        value={restaurantConfig.same_day_booking_hours || ''}
+                        onChange={(e) => updateRestaurantConfig('same_day_booking_hours', e.target.value)}
+                        placeholder="2"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Hours before service for same-day bookings
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Max Party Size
+                      </label>
+                      <Input
+                        type="number"
+                        value={restaurantConfig.max_party_size || ''}
+                        onChange={(e) => updateRestaurantConfig('max_party_size', e.target.value)}
+                        placeholder="12"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Maximum guests per reservation
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Working Hours Summary */}
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700">
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-indigo-600" />
+                    Current Working Hours
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                    {workingHours.map((day) => (
+                      <div key={day.day_of_week} className="text-center p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
+                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                          {day.day_name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {day.is_open ? (
+                            <>
+                              <div>Open: {day.open_time?.slice(0, 5)} - {day.close_time?.slice(0, 5)}</div>
+                              {day.is_lunch_service && (
+                                <div>Lunch: {day.lunch_start?.slice(0, 5)} - {day.lunch_end?.slice(0, 5)}</div>
+                              )}
+                              {day.is_dinner_service && (
+                                <div>Dinner: {day.dinner_start?.slice(0, 5)} - {day.dinner_end?.slice(0, 5)}</div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-red-500">Closed</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-center">
+                    <Button
+                      variant="outline"
+                      onClick={() => window.location.href = '/restaurant-settings'}
+                      className="border-blue-200 dark:border-blue-600 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Edit Working Hours
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            )}
+          </Card>
+
+
+
           {/* Reservations Table */}
           <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl">
             <CardHeader>
@@ -503,9 +915,19 @@ export default function Reservations() {
                               <Button 
                                 variant="outline" 
                                 size="sm" 
+                                onClick={() => handleViewReservation(reservation)}
                                 className="border-blue-200 dark:border-blue-600 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                               >
                                 <Eye className="h-3 w-3" />
+                              </Button>
+                              
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleEditReservation(reservation)}
+                                className="border-green-200 dark:border-green-600 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
+                              >
+                                <Edit className="h-3 w-3" />
                               </Button>
                               
                               <Select 
@@ -570,6 +992,32 @@ export default function Reservations() {
             </CardContent>
           </Card>
         </div>
+
+        {/* New Reservation Modal */}
+        {showNewReservationModal && (
+          <NewReservationModal
+            isOpen={showNewReservationModal}
+            onClose={() => setShowNewReservationModal(false)}
+            onSubmit={handleCreateReservation}
+            tables={tables}
+          />
+        )}
+
+        {/* Edit Reservation Modal */}
+        {showEditReservationModal && editingReservation && (
+          <EditReservationModal
+            isOpen={showEditReservationModal}
+            onClose={() => {
+              setShowEditReservationModal(false);
+              setEditingReservation(null);
+            }}
+            onSubmit={(updates) => handleUpdateReservation(editingReservation.id, updates)}
+            reservation={editingReservation}
+            tables={tables}
+          />
+        )}
+
+
       </div>
     </Layout>
   );

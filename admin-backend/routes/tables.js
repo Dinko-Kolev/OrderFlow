@@ -57,7 +57,6 @@ router.get('/', async (req, res) => {
           LIMIT 1
         ) as today_reservation
       FROM restaurant_tables rt
-      WHERE rt.is_active = true
       ORDER BY rt.table_number
     `;
     
@@ -124,34 +123,55 @@ router.get('/status', async (req, res) => {
   }
 });
 
-// PUT /api/admin/tables/:id - Update table (activate/deactivate)
+// PUT /api/admin/tables/:id - Update table
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { is_active, table_type, location_description } = req.body;
+    const { table_name, table_number, capacity, table_type, location_description, is_active } = req.body;
     
     const client = await pool.connect();
+    
+    // Check if table number already exists (if changing table number)
+    if (table_number) {
+      const existingTable = await client.query(
+        'SELECT id FROM restaurant_tables WHERE table_number = $1 AND id != $2',
+        [table_number, id]
+      );
+      
+      if (existingTable.rows.length > 0) {
+        client.release();
+        return res.status(400).json({
+          success: false,
+          error: 'Table number already exists'
+        });
+      }
+    }
     
     const query = `
       UPDATE restaurant_tables 
       SET 
-        is_active = COALESCE($1, is_active),
-        table_type = COALESCE($2, table_type),
-        location_description = COALESCE($3, location_description),
+        name = COALESCE($1, name),
+        table_number = COALESCE($2, table_number),
+        capacity = COALESCE($3, capacity),
+        table_type = COALESCE($4, table_type),
+        location_description = COALESCE($5, location_description),
+        is_active = COALESCE($6, is_active),
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
+      WHERE id = $7
       RETURNING *
     `;
     
-    const result = await client.query(query, [is_active, table_type, location_description, id]);
-    client.release();
+    const result = await client.query(query, [
+      table_name, 
+      table_number, 
+      capacity, 
+      table_type, 
+      location_description, 
+      is_active, 
+      id
+    ]);
     
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Table not found'
-      });
-    }
+    client.release();
     
     res.json({
       success: true,
@@ -164,6 +184,133 @@ router.put('/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update table',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/admin/tables - Create new table
+router.post('/', async (req, res) => {
+  try {
+    const { table_name, table_number, capacity, location, is_available } = req.body;
+    
+    // Validate required fields
+    if (!table_name || !table_number || !capacity) {
+      return res.status(400).json({
+        success: false,
+        error: 'Table name, table number, and capacity are required'
+      });
+    }
+
+    const client = await pool.connect();
+    
+    // Check if table number already exists
+    const existingTable = await client.query(
+      'SELECT id FROM restaurant_tables WHERE table_number = $1',
+      [table_number]
+    );
+    
+    if (existingTable.rows.length > 0) {
+      client.release();
+      return res.status(400).json({
+        success: false,
+        error: 'Table number already exists'
+      });
+    }
+
+    // Insert new table
+    const query = `
+      INSERT INTO restaurant_tables (
+        name, 
+        table_number, 
+        capacity, 
+        min_party_size,
+        table_type,
+        location_description,
+        is_active,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING *
+    `;
+    
+    const result = await client.query(query, [
+      table_name, 
+      table_number, 
+      capacity, 
+      Math.ceil(capacity / 2), // min_party_size as half of capacity
+      location || 'standard',
+      location || 'Main Area',
+      is_available !== false // default to true
+    ]);
+    
+    client.release();
+    
+    res.status(201).json({
+      success: true,
+      data: result.rows[0],
+      message: 'Table created successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error creating table:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create table',
+      details: error.message
+    });
+  }
+});
+
+// DELETE /api/admin/tables/:id - Delete table
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const client = await pool.connect();
+    
+    // Check if table has any reservations
+    const reservationsCheck = await client.query(
+      'SELECT COUNT(*) FROM table_reservations WHERE table_id = $1',
+      [id]
+    );
+    
+    if (parseInt(reservationsCheck.rows[0].count) > 0) {
+      client.release();
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot delete table with existing reservations'
+      });
+    }
+    
+    // Soft delete by setting is_active to false
+    const query = `
+      UPDATE restaurant_tables 
+      SET is_active = false, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING *
+    `;
+    
+    const result = await client.query(query, [id]);
+    client.release();
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Table not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Table deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error deleting table:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete table',
       details: error.message
     });
   }

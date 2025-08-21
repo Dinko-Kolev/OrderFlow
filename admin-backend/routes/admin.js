@@ -10,6 +10,7 @@ router.use("/dashboard", require("./dashboard"));
 router.use("/tables", require("./tables"));
 router.use("/reservations", require("./reservations"));
 router.use("/inventory", require("./inventory"));
+router.use("/restaurant", require("./restaurant"));
 
 // Legacy endpoints for backward compatibility
 router.get("/products", async (req, res) => {
