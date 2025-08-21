@@ -132,6 +132,113 @@ router.get('/', async (req, res) => {
   }
 });
 
+// POST /api/admin/reservations - Create new reservation
+router.post('/', async (req, res) => {
+  try {
+    const {
+      customer_name,
+      customer_email,
+      customer_phone,
+      reservation_date,
+      reservation_time,
+      number_of_guests,
+      table_id,
+      special_requests
+    } = req.body;
+
+    // Validate required fields
+    if (!customer_name || !customer_email || !reservation_date || !reservation_time || !number_of_guests || !table_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        details: 'customer_name, customer_email, reservation_date, reservation_time, number_of_guests, and table_id are required'
+      });
+    }
+
+    const client = await pool.connect();
+
+    // Check if table exists and is available
+    const tableCheck = await client.query(
+      'SELECT id, name, capacity, is_active FROM restaurant_tables WHERE id = $1',
+      [table_id]
+    );
+
+    if (tableCheck.rows.length === 0) {
+      client.release();
+      return res.status(400).json({
+        success: false,
+        error: 'Table not found'
+      });
+    }
+
+    if (!tableCheck.rows[0].is_active) {
+      client.release();
+      return res.status(400).json({
+        success: false,
+        error: 'Table is not active'
+      });
+    }
+
+    // Check if table is available at the requested time
+    const availabilityCheck = await client.query(
+      `SELECT id FROM table_reservations 
+       WHERE table_id = $1 
+       AND reservation_date = $2 
+       AND status IN ('confirmed', 'seated')
+       AND (
+         (reservation_time <= $3 AND reservation_time + INTERVAL '105 minutes' > $3) OR
+         ($3 <= reservation_time AND $3 + INTERVAL '105 minutes' > reservation_time)
+       )`,
+      [table_id, reservation_date, reservation_time]
+    );
+
+    if (availabilityCheck.rows.length > 0) {
+      client.release();
+      return res.status(400).json({
+        success: false,
+        error: 'Table is not available at the requested time'
+      });
+    }
+
+    // Create the reservation
+    const insertQuery = `
+      INSERT INTO table_reservations (
+        customer_name, customer_email, customer_phone, 
+        reservation_date, reservation_time, number_of_guests, 
+        table_id, special_requests, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'confirmed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING *
+    `;
+
+    const result = await client.query(insertQuery, [
+      customer_name,
+      customer_email,
+      customer_phone,
+      reservation_date,
+      reservation_time,
+      number_of_guests,
+      table_id,
+      special_requests || ''
+    ]);
+
+    client.release();
+
+    res.status(201).json({
+      success: true,
+      data: result.rows[0],
+      message: 'Reservation created successfully'
+    });
+
+  } catch (error) {
+    console.error('Error creating reservation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create reservation',
+      details: error.message
+    });
+  }
+});
+
 // GET /api/admin/reservations/calendar - Get calendar view data
 router.get('/calendar', async (req, res) => {
   try {
