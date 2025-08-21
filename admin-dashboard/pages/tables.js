@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTheme } from '../contexts/ThemeContext';
 import Layout from '../components/Layout';
+import NewTableModal from '../components/NewTableModal';
+import EditTableModal from '../components/EditTableModal';
 import { 
   Table as TableIcon,
   Users,
@@ -16,7 +18,9 @@ import {
   Eye,
   Edit,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  Trash2
 } from 'lucide-react';
 
 export default function Tables() {
@@ -24,6 +28,10 @@ export default function Tables() {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showNewTableModal, setShowNewTableModal] = useState(false);
+  const [showEditTableModal, setShowEditTableModal] = useState(false);
+  const [editingTable, setEditingTable] = useState(null);
+
 
   const fetchTables = async () => {
     try {
@@ -59,7 +67,104 @@ export default function Tables() {
     return () => clearInterval(interval);
   }, []);
 
-  const getStatusBadge = (status) => {
+  const handleCreateTable = async (tableData) => {
+    try {
+      const response = await fetch('http://localhost:3003/api/admin/tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tableData)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        if (window.showToast) {
+          window.showToast('Table created successfully', 'success', 2000);
+        }
+        setShowNewTableModal(false);
+        fetchTables(); // Refresh the list
+      } else {
+        throw new Error(data.error || 'Failed to create table');
+      }
+    } catch (error) {
+      console.error('Error creating table:', error);
+      if (window.showToast) {
+        window.showToast('Failed to create table', 'error', 4000);
+      }
+    }
+  };
+
+  const handleUpdateTable = async (tableId, updates) => {
+    try {
+      const response = await fetch(`http://localhost:3003/api/admin/tables/${tableId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        if (window.showToast) {
+          window.showToast('Table updated successfully', 'success', 2000);
+        }
+        setShowEditTableModal(false);
+        setEditingTable(null);
+        fetchTables(); // Refresh the list
+      } else {
+        throw new Error(data.error || 'Failed to update table');
+      }
+    } catch (error) {
+      console.error('Error updating table:', error);
+      if (window.showToast) {
+        window.showToast('Failed to update table', 'error', 4000);
+      }
+    }
+  };
+
+  const handleDeleteTable = async (tableId) => {
+    if (!confirm('Are you sure you want to delete this table? This will also delete all associated reservations.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3003/api/admin/tables/${tableId}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        if (window.showToast) {
+          window.showToast('Table deleted successfully', 'success', 2000);
+        }
+        fetchTables(); // Refresh the list
+      } else {
+        throw new Error(data.error || 'Failed to delete table');
+      }
+    } catch (error) {
+      console.error('Error deleting table:', error);
+      if (window.showToast) {
+        window.showToast('Failed to delete table', 'error', 4000);
+      }
+    }
+  };
+
+
+
+  const handleEditTable = (table) => {
+    setEditingTable(table);
+    setShowEditTableModal(true);
+  };
+
+  const getStatusBadge = (table) => {
+    // Check if table is inactive first
+    if (!table.is_active) {
+      return (
+        <Badge variant="secondary" className="bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400">
+          <XCircle className="h-3 w-3 mr-1" />
+          Inactive
+        </Badge>
+      );
+    }
+    
     const statusConfig = {
       'available': { 
         color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
@@ -73,7 +178,7 @@ export default function Tables() {
       }
     };
     
-    const config = statusConfig[status] || statusConfig['available'];
+    const config = statusConfig[table.current_status] || statusConfig['available'];
     const IconComponent = config.icon;
     
     return (
@@ -146,8 +251,11 @@ export default function Tables() {
                   <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                   {loading ? 'Refreshing...' : 'Refresh'}
                 </Button>
-                <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 dark:from-green-500 dark:to-emerald-500 dark:hover:from-green-600 dark:hover:to-emerald-600 text-white shadow-lg">
-                  <TableIcon className="w-4 h-4 mr-2" />
+                <Button 
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 dark:from-green-500 dark:to-emerald-500 dark:hover:from-green-600 dark:hover:to-emerald-600 text-white shadow-lg"
+                  onClick={() => setShowNewTableModal(true)}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
                   Add Table
                 </Button>
               </div>
@@ -180,6 +288,9 @@ export default function Tables() {
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total Tables</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{tables.length}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {tables.filter(t => t.is_active).length} active, {tables.filter(t => !t.is_active).length} inactive
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -194,7 +305,7 @@ export default function Tables() {
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Available</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                      {tables.filter(t => t.current_status === 'available').length}
+                      {tables.filter(t => t.is_active && t.current_status === 'available').length}
                     </p>
                   </div>
                 </div>
@@ -210,7 +321,7 @@ export default function Tables() {
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Reserved</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                      {tables.filter(t => t.current_status === 'reserved').length}
+                      {tables.filter(t => t.is_active && t.current_status === 'reserved').length}
                     </p>
                   </div>
                 </div>
@@ -226,7 +337,7 @@ export default function Tables() {
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total Capacity</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                      {tables.reduce((sum, t) => sum + t.capacity, 0)}
+                      {tables.filter(t => t.is_active).reduce((sum, t) => sum + t.capacity, 0)}
                     </p>
                   </div>
                 </div>
@@ -272,7 +383,7 @@ export default function Tables() {
                             Table {table.table_number}
                           </p>
                         </div>
-                        {getStatusBadge(table.current_status)}
+                        {getStatusBadge(table)}
                       </div>
 
                       <div className="space-y-2">
@@ -308,21 +419,24 @@ export default function Tables() {
                       </div>
 
                       <div className="mt-3 flex space-x-2">
+
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          className="flex-1 text-xs border-blue-200 dark:border-blue-600 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                          View
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                          onClick={() => handleEditTable(table)}
                           className="flex-1 text-xs border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900/20"
                         >
                           <Edit className="h-3 w-3 mr-1" />
                           Edit
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleDeleteTable(table.id)}
+                          className="flex-1 text-xs border-red-200 dark:border-red-600 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Delete
                         </Button>
                       </div>
                     </div>
@@ -332,6 +446,28 @@ export default function Tables() {
             </CardContent>
           </Card>
         </div>
+
+        {/* New Table Modal */}
+        {showNewTableModal && (
+          <NewTableModal
+            isOpen={showNewTableModal}
+            onClose={() => setShowNewTableModal(false)}
+            onSubmit={handleCreateTable}
+          />
+        )}
+
+        {/* Edit Table Modal */}
+        {showEditTableModal && editingTable && (
+          <EditTableModal
+            isOpen={showEditTableModal}
+            onClose={() => {
+              setShowEditTableModal(false);
+              setEditingTable(null);
+            }}
+            onSubmit={(updates) => handleUpdateTable(editingTable.id, updates)}
+            table={editingTable}
+          />
+        )}
       </div>
     </Layout>
   );

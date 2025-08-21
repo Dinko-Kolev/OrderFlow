@@ -20,7 +20,12 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  Plus
+  Plus,
+  Settings,
+  Building2,
+  Eye,
+  Edit,
+  Trash2
 } from 'lucide-react';
 
 export default function Calendar() {
@@ -32,6 +37,8 @@ export default function Calendar() {
   const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedReservation, setSelectedReservation] = useState(null);
+
+  const [restaurantConfig, setRestaurantConfig] = useState({});
 
   // Get current month/year for display
   const currentMonth = currentDate.getMonth();
@@ -84,6 +91,43 @@ export default function Calendar() {
     setCurrentDate(new Date());
   };
 
+  // Calendar action functions
+  const handleViewReservation = (reservation) => {
+    setSelectedReservation(reservation);
+    if (window.showToast) {
+      window.showToast(`Viewing reservation for ${reservation.customer_name}`, 'info', 2000);
+    }
+  };
+
+  const handleEditReservation = (reservation) => {
+    if (window.showToast) {
+      window.showToast(`Edit functionality coming soon for ${reservation.customer_name}`, 'info', 2000);
+    }
+  };
+
+  const handleDeleteReservation = (reservation) => {
+    if (confirm(`Are you sure you want to delete the reservation for ${reservation.customer_name}?`)) {
+      if (window.showToast) {
+        window.showToast(`Delete functionality coming soon for ${reservation.customer_name}`, 'info', 2000);
+      }
+    }
+  };
+
+
+
+  // Fetch restaurant configuration
+  const fetchRestaurantConfig = async () => {
+    try {
+      const configResponse = await fetch('http://localhost:3003/api/admin/restaurant/config');
+      const configData = await configResponse.json();
+      if (configData.success) {
+        setRestaurantConfig(configData.data);
+      }
+    } catch (error) {
+      console.error('Error fetching restaurant config:', error);
+    }
+  };
+
   // Fetch reservations for the current month
   const fetchReservations = async () => {
     try {
@@ -124,6 +168,7 @@ export default function Calendar() {
 
   useEffect(() => {
     fetchReservations();
+    fetchRestaurantConfig();
   }, [currentMonth, currentYear]);
 
   const getStatusBadge = (status) => {
@@ -257,11 +302,15 @@ export default function Calendar() {
                 <Button 
                   variant="outline"
                   onClick={goToToday}
-                  className="border-green-200 dark:border-green-600 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
+                  className="border-green-200 dark:border-green-600 text-green-700 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/20"
                 >
                   Today
                 </Button>
-                <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 dark:from-green-500 dark:to-emerald-500 dark:hover:from-green-600 dark:hover:to-emerald-600 text-white shadow-lg">
+
+                <Button 
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 dark:from-green-500 dark:to-emerald-500 dark:hover:from-green-600 dark:hover:to-emerald-600 text-white shadow-lg"
+                  onClick={() => window.location.href = '/reservations'}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   New Reservation
                 </Button>
@@ -339,6 +388,8 @@ export default function Calendar() {
               </div>
             </CardContent>
           </Card>
+
+
 
           {/* Calendar Grid */}
           <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl">
@@ -532,6 +583,42 @@ export default function Calendar() {
                               <SelectItem value="no_show">No Show</SelectItem>
                             </SelectContent>
                           </Select>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Actions</h4>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewReservation(selectedReservation)}
+                            className="border-blue-200 dark:border-blue-600 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditReservation(selectedReservation)}
+                            className="border-green-200 dark:border-green-600 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteReservation(selectedReservation)}
+                            className="border-red-200 dark:border-red-600 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
                         </div>
                       </div>
                     </div>
