@@ -12,7 +12,7 @@ import {
   Trash2,
   Eye,
   Package,
-  DollarSign,
+  Euro,
   AlertCircle,
   CheckCircle,
   XCircle,
@@ -25,6 +25,7 @@ import {
 export default function Products() {
   const { isDarkMode } = useTheme();
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,6 +45,7 @@ export default function Products() {
     image_url: '',
     is_available: true
   });
+  const [displayLimit, setDisplayLimit] = useState(100);
 
   useEffect(() => {
     fetchProducts();
@@ -54,7 +56,7 @@ export default function Products() {
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [displayLimit]);
 
   const fetchProducts = async () => {
     try {
@@ -63,13 +65,16 @@ export default function Products() {
       const data = await response.json();
       
       if (data.success) {
-        setProducts(data.data || []);
+        setAllProducts(data.data || []);
+        // Show first 100 products initially
+        const productsToShow = (data.data || []).slice(0, displayLimit);
+        setProducts(productsToShow);
         if (data.data && data.data.length > 0) {
-          window.showToast(`${data.data.length} products loaded successfully`, 'success', 2000);
+          window.showToast(`${data.data.length} products loaded (showing ${productsToShow.length})`, 'success', 2000);
         } else {
           window.showToast('No products found', 'warning', 2000);
-          }
         }
+      }
       } catch (error) {
         console.error('Error fetching products:', error);
         setProducts([]);
@@ -101,10 +106,10 @@ export default function Products() {
   };
 
   const formatCurrency = (amount) => {
-    if (!amount) return '$0.00';
+    if (!amount) return '€0.00';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'EUR'
     }).format(amount);
   };
 
@@ -148,6 +153,21 @@ export default function Products() {
     setSelectedProduct(product);
     setShowDeleteModal(true);
     window.showToast(`Confirming deletion of: ${product.name}`, 'warning', 3000);
+  };
+
+  const handleShowMoreProducts = () => {
+    const newLimit = Math.min(displayLimit + 100, allProducts.length);
+    setDisplayLimit(newLimit);
+    const productsToShow = allProducts.slice(0, newLimit);
+    setProducts(productsToShow);
+    window.showToast(`Now showing ${productsToShow.length} products`, 'info', 2000);
+  };
+
+  const handleShowLessProducts = () => {
+    setDisplayLimit(100);
+    const productsToShow = allProducts.slice(0, 100);
+    setProducts(productsToShow);
+    window.showToast(`Now showing ${productsToShow.length} products`, 'info', 2000);
   };
 
   const handleCloseModal = () => {
@@ -453,7 +473,7 @@ export default function Products() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-300">Catalog Value</CardTitle>
                 <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                  <DollarSign className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  <Euro className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 </div>
               </div>
             </CardHeader>
@@ -960,7 +980,7 @@ export default function Products() {
                     </div>
 
                     <div className="flex items-center space-x-3">
-                      <DollarSign className="w-5 h-5 text-green-500" />
+                      <Euro className="w-5 h-5 text-green-500" />
                       <span className="text-gray-700 dark:text-gray-300">
                         <span className="font-medium">Price:</span> {formatCurrency(selectedProduct.base_price)}
                       </span>
