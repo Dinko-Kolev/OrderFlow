@@ -12,7 +12,7 @@ export default function NewTableModal({ isOpen, onClose, onSubmit }) {
     table_number: '',
     capacity: '',
     location: '',
-    is_available: true
+    is_active: true
   });
 
   const handleSubmit = (e) => {
@@ -89,30 +89,33 @@ export default function NewTableModal({ isOpen, onClose, onSubmit }) {
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="main_area">Main Area</SelectItem>
-                    <SelectItem value="window">Window</SelectItem>
-                    <SelectItem value="patio">Patio</SelectItem>
-                    <SelectItem value="bar">Bar</SelectItem>
-                    <SelectItem value="private">Private Room</SelectItem>
+                    <SelectItem value="Main Area">Main Area</SelectItem>
+                    <SelectItem value="Window">Window</SelectItem>
+                    <SelectItem value="Patio">Patio</SelectItem>
+                    <SelectItem value="Bar">Bar</SelectItem>
+                    <SelectItem value="Private Room">Private Room</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="is_available">Status</Label>
+              <Label htmlFor="is_active">Table Status</Label>
               <Select
-                value={formData.is_available.toString()}
-                onValueChange={(value) => handleChange('is_available', value === 'true')}
+                value={formData.is_active.toString()}
+                onValueChange={(value) => handleChange('is_active', value === 'true')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="true">Available</SelectItem>
-                  <SelectItem value="false">Unavailable</SelectItem>
+                  <SelectItem value="true">Active (Available for Reservations)</SelectItem>
+                  <SelectItem value="false">Inactive (Not Available for Reservations)</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-sm text-gray-500 mt-1">
+                Active tables can receive reservations. Inactive tables are temporarily removed from the reservation system.
+              </p>
             </div>
 
             {/* Action Buttons */}

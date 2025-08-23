@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from '../contexts/ThemeContext';
 import Layout from '../components/Layout';
+import NewReservationModal from '../components/NewReservationModal';
 import { 
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -37,8 +38,10 @@ export default function Calendar() {
   const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedReservation, setSelectedReservation] = useState(null);
+  const [showNewReservationModal, setShowNewReservationModal] = useState(false);
 
   const [restaurantConfig, setRestaurantConfig] = useState({});
+  const [tables, setTables] = useState([]);
 
   // Get current month/year for display
   const currentMonth = currentDate.getMonth();
@@ -48,23 +51,50 @@ export default function Calendar() {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // Get week days for header (Monday first)
+  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
   // Generate calendar days
   const getCalendarDays = () => {
-    const firstDay = new Date(currentYear, currentMonth, 1);
-    const lastDay = new Date(currentYear, currentMonth + 1, 0);
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay()); // Start from Sunday
-    
-    const days = [];
-    const currentDateCopy = new Date(startDate);
-    
-    // Generate 42 days (6 weeks) to ensure we cover the month
-    for (let i = 0; i < 42; i++) {
-      days.push(new Date(currentDateCopy));
-      currentDateCopy.setDate(currentDateCopy.getDate() + 1);
+    if (viewMode === 'week') {
+      // Week view: show only current week
+      const today = new Date();
+      const currentDayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const daysToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Convert to Monday-based
+      
+      const mondayOfCurrentWeek = new Date(today);
+      mondayOfCurrentWeek.setDate(today.getDate() - daysToMonday);
+      
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(mondayOfCurrentWeek);
+        day.setDate(mondayOfCurrentWeek.getDate() + i);
+        days.push(day);
+      }
+      return days;
+    } else {
+      // Month view: show full month
+      const firstDay = new Date(currentYear, currentMonth, 1);
+      const lastDay = new Date(currentYear, currentMonth + 1, 0);
+      const startDate = new Date(firstDay);
+      
+      // Calculate days to subtract to get to Monday of the week containing the first day
+      const firstDayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const daysToSubtract = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; // Convert to Monday-based
+      
+      startDate.setDate(startDate.getDate() - daysToSubtract);
+      
+      const days = [];
+      const currentDateCopy = new Date(startDate);
+      
+      // Generate 42 days (6 weeks) to ensure we cover the month
+      for (let i = 0; i < 42; i++) {
+        days.push(new Date(currentDateCopy));
+        currentDateCopy.setDate(currentDateCopy.getDate() + 1);
+      }
+      
+      return days;
     }
-    
-    return days;
   };
 
   // Get reservations for a specific date
@@ -75,9 +105,6 @@ export default function Calendar() {
     );
   };
 
-  // Get week days for header
-  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
   // Navigation functions
   const goToPreviousMonth = () => {
     setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
@@ -87,8 +114,37 @@ export default function Calendar() {
     setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
   };
 
+  const goToPreviousWeek = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() - 7);
+    setCurrentDate(newDate);
+  };
+
+  const goToNextWeek = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + 7);
+    setCurrentDate(newDate);
+  };
+
   const goToToday = () => {
     setCurrentDate(new Date());
+  };
+
+  // Helper function to format time
+  const formatTime = (timeString) => {
+    if (!timeString) return '';
+    return timeString.substring(0, 5); // Format HH:MM
+  };
+
+  // Helper function to get the start of the current week (Monday)
+  const getWeekStartDate = () => {
+    const today = new Date();
+    const currentDayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Convert to Monday-based
+    
+    const mondayOfCurrentWeek = new Date(today);
+    mondayOfCurrentWeek.setDate(today.getDate() - daysToMonday);
+    return mondayOfCurrentWeek;
   };
 
   // Calendar action functions
@@ -113,6 +169,15 @@ export default function Calendar() {
     }
   };
 
+  const handleDateClick = (date) => {
+    setSelectedDate(date);
+    setSelectedReservation(null);
+  };
+
+  const handleReservationClick = (reservation) => {
+    setSelectedReservation(reservation);
+    setSelectedDate(null);
+  };
 
 
   // Fetch restaurant configuration
@@ -125,6 +190,19 @@ export default function Calendar() {
       }
     } catch (error) {
       console.error('Error fetching restaurant config:', error);
+    }
+  };
+
+  // Fetch tables for new reservations
+  const fetchTables = async () => {
+    try {
+      const response = await fetch('http://localhost:3003/api/admin/tables');
+      const data = await response.json();
+      if (data.success) {
+        setTables(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching tables:', error);
     }
   };
 
@@ -169,7 +247,8 @@ export default function Calendar() {
   useEffect(() => {
     fetchReservations();
     fetchRestaurantConfig();
-  }, [currentMonth, currentYear]);
+    fetchTables();
+  }, [currentMonth, currentYear, viewMode]);
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -209,25 +288,6 @@ export default function Calendar() {
         {config.text}
       </Badge>
     );
-  };
-
-  const formatTime = (timeString) => {
-    if (!timeString) return 'N/A';
-    return timeString.substring(0, 5); // Format HH:MM
-  };
-
-  const handleDateClick = (date) => {
-    setSelectedDate(date);
-    const dateReservations = getReservationsForDate(date);
-    if (dateReservations.length > 0) {
-      setSelectedReservation(dateReservations[0]);
-    } else {
-      setSelectedReservation(null);
-    }
-  };
-
-  const handleReservationClick = (reservation) => {
-    setSelectedReservation(reservation);
   };
 
   const handleStatusUpdate = async (reservationId, newStatus) => {
@@ -309,7 +369,7 @@ export default function Calendar() {
 
                 <Button 
                   className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 dark:from-green-500 dark:to-emerald-500 dark:hover:from-green-600 dark:hover:to-emerald-600 text-white shadow-lg"
-                  onClick={() => window.location.href = '/reservations'}
+                  onClick={() => setShowNewReservationModal(true)}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   New Reservation
@@ -342,7 +402,7 @@ export default function Calendar() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={goToPreviousMonth}
+                    onClick={viewMode === 'week' ? goToPreviousWeek : goToPreviousMonth}
                     className="border-gray-300 dark:border-gray-600"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -350,14 +410,18 @@ export default function Calendar() {
                   
                   <div className="text-center">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                      {monthNames[currentMonth]} {currentYear}
+                      {viewMode === 'week' ? (
+                        `Week of ${getWeekStartDate().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`
+                      ) : (
+                        `${monthNames[currentMonth]} ${currentYear}`
+                      )}
                     </h2>
                   </div>
                   
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={goToNextMonth}
+                    onClick={viewMode === 'week' ? goToNextWeek : goToNextMonth}
                     className="border-gray-300 dark:border-gray-600"
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -629,6 +693,39 @@ export default function Calendar() {
           )}
         </div>
       </div>
+
+      <NewReservationModal
+        isOpen={showNewReservationModal}
+        onClose={() => setShowNewReservationModal(false)}
+        onSubmit={async (reservationData) => {
+          try {
+            // Make the actual API call to create the reservation
+            const response = await fetch('http://localhost:3003/api/admin/reservations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(reservationData)
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+              if (window.showToast) {
+                window.showToast('Reservation created successfully! 🎉', 'success', 3000);
+              }
+              fetchReservations(); // Refresh the calendar
+              setShowNewReservationModal(false);
+            } else {
+              throw new Error(data.error || 'Failed to create reservation');
+            }
+          } catch (error) {
+            console.error('Error creating reservation:', error);
+            if (window.showToast) {
+              window.showToast(`Failed to create reservation: ${error.message}`, 'error', 4000);
+            }
+          }
+        }}
+        tables={tables}
+      />
     </Layout>
   );
 }
