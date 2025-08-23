@@ -8,11 +8,13 @@ import {
   Clock, 
   CheckCircle, 
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Info
 } from 'lucide-react';
 
 const TableStatusWidget = ({ isDarkMode }) => {
   const [tableStatus, setTableStatus] = useState(null);
+  const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -41,9 +43,59 @@ const TableStatusWidget = ({ isDarkMode }) => {
     }
   };
 
+  const fetchTables = async () => {
+    try {
+      const response = await fetch('http://localhost:3003/api/admin/tables');
+      const data = await response.json();
+      if (data.success) {
+        setTables(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching tables:', error);
+    }
+  };
+
+  // Calculate availability for different party sizes
+  const getAvailabilityForPartySize = (partySize) => {
+    const availableTables = tables.filter(table => 
+      table.is_active && table.capacity >= partySize
+    );
+    return availableTables.length;
+  };
+
+  // Get common party sizes and their availability
+  const getCommonPartySizes = () => {
+    const commonSizes = [2, 4, 6, 8, 10];
+    return commonSizes.map(size => ({
+      size,
+      available: getAvailabilityForPartySize(size)
+    }));
+  };
+
+  // Check if there are any critical availability issues
+  const getAvailabilityWarnings = () => {
+    const warnings = [];
+    const commonSizes = getCommonPartySizes();
+    
+    // Check for sizes with no available tables
+    commonSizes.forEach(({ size, available }) => {
+      if (available === 0) {
+        warnings.push(`No tables available for ${size} guests`);
+      } else if (available <= 1) {
+        warnings.push(`Limited availability for ${size} guests (${available} table)`);
+      }
+    });
+    
+    return warnings;
+  };
+
   useEffect(() => {
     fetchTableStatus();
-    const interval = setInterval(fetchTableStatus, 30 * 1000); // Refresh every 30 seconds
+    fetchTables(); // Fetch tables when the widget loads
+    const interval = setInterval(() => {
+      fetchTableStatus();
+      fetchTables(); // Refresh tables every 30 seconds
+    }, 30 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -105,6 +157,8 @@ const TableStatusWidget = ({ isDarkMode }) => {
 
   const { total_tables, active_tables, reserved_tables, available_tables } = tableStatus;
   const utilizationRate = total_tables > 0 ? Math.round((reserved_tables / total_tables) * 100) : 0;
+  const availabilityWarnings = getAvailabilityWarnings();
+  const hasWarnings = availabilityWarnings.length > 0;
 
   return (
     <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
@@ -175,6 +229,51 @@ const TableStatusWidget = ({ isDarkMode }) => {
               <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
                 {active_tables}
               </Badge>
+            </div>
+          </div>
+
+          {/* Availability Warnings */}
+          {hasWarnings && (
+            <div className="pt-2 border-t border-gray-200 dark:border-slate-700">
+              <div className="flex items-center space-x-2 mb-2">
+                <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
+                  Availability Warnings
+                </span>
+              </div>
+              <div className="space-y-1">
+                {availabilityWarnings.map((warning, index) => (
+                  <div key={index} className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 p-2 rounded">
+                    {warning}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Party Size Breakdown */}
+          <div className="pt-2 border-t border-gray-200 dark:border-slate-700">
+            <div className="flex items-center space-x-2 mb-2">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                Party Size Availability
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {getCommonPartySizes().map(({ size, available }) => (
+                <div key={size} className="text-center">
+                  <div className={`text-sm font-bold ${
+                    available === 0 ? 'text-red-600 dark:text-red-400' : 
+                    available <= 1 ? 'text-orange-600 dark:text-orange-400' : 
+                    'text-green-600 dark:text-green-400'
+                  }`}>
+                    {available}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {size} guests
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

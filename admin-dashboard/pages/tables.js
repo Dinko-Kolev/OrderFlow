@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import Layout from '../components/Layout';
 import NewTableModal from '../components/NewTableModal';
 import EditTableModal from '../components/EditTableModal';
+import TableReservationsWidget from '../components/TableReservationsWidget';
 import { 
   Table as TableIcon,
   Users,
@@ -31,7 +32,7 @@ export default function Tables() {
   const [showNewTableModal, setShowNewTableModal] = useState(false);
   const [showEditTableModal, setShowEditTableModal] = useState(false);
   const [editingTable, setEditingTable] = useState(null);
-
+  const [deletingTable, setDeletingTable] = useState(null);
 
   const fetchTables = async () => {
     try {
@@ -44,6 +45,7 @@ export default function Tables() {
       if (data.success) {
         setTables(data.data);
         console.log('🍽️ Tables loaded:', data.data);
+        // Show toast using window.showToast (already set up in ToastContainer)
         if (window.showToast) {
           window.showToast(`${data.data.length} tables loaded successfully`, 'success', 2000);
         }
@@ -64,7 +66,18 @@ export default function Tables() {
   useEffect(() => {
     fetchTables();
     const interval = setInterval(fetchTables, 30 * 1000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
+    
+    // Show welcome toast after a short delay
+    const timer = setTimeout(() => {
+      if (window.showToast) {
+        window.showToast('Tables management system ready! 🍽️', 'success', 3000);
+      }
+    }, 1000);
+    
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleCreateTable = async (tableData) => {
@@ -78,7 +91,7 @@ export default function Tables() {
       const data = await response.json();
       if (data.success) {
         if (window.showToast) {
-          window.showToast('Table created successfully', 'success', 2000);
+          window.showToast('Table created successfully! 🎉', 'success', 3000);
         }
         setShowNewTableModal(false);
         fetchTables(); // Refresh the list
@@ -88,7 +101,7 @@ export default function Tables() {
     } catch (error) {
       console.error('Error creating table:', error);
       if (window.showToast) {
-        window.showToast('Failed to create table', 'error', 4000);
+        window.showToast(`Failed to create table: ${error.message}`, 'error', 4000);
       }
     }
   };
@@ -104,7 +117,7 @@ export default function Tables() {
       const data = await response.json();
       if (data.success) {
         if (window.showToast) {
-          window.showToast('Table updated successfully', 'success', 2000);
+          window.showToast('Table updated successfully! ✨', 'success', 3000);
         }
         setShowEditTableModal(false);
         setEditingTable(null);
@@ -115,17 +128,22 @@ export default function Tables() {
     } catch (error) {
       console.error('Error updating table:', error);
       if (window.showToast) {
-        window.showToast('Failed to update table', 'error', 4000);
+        window.showToast(`Failed to update table: ${error.message}`, 'error', 4000);
       }
     }
   };
 
   const handleDeleteTable = async (tableId) => {
-    if (!confirm('Are you sure you want to delete this table? This will also delete all associated reservations.')) {
+    // Show confirmation dialog
+    if (!confirm('⚠️ WARNING: This will PERMANENTLY DELETE the table and all associated data!\n\nThis action cannot be undone.\n\nAre you absolutely sure you want to proceed?')) {
       return;
     }
 
     try {
+      if (window.showToast) {
+        window.showToast('Deleting table...', 'info', 2000);
+      }
+
       const response = await fetch(`http://localhost:3003/api/admin/tables/${tableId}`, {
         method: 'DELETE'
       });
@@ -133,7 +151,7 @@ export default function Tables() {
       const data = await response.json();
       if (data.success) {
         if (window.showToast) {
-          window.showToast('Table deleted successfully', 'success', 2000);
+          window.showToast('Table permanently deleted! 🗑️', 'success', 4000);
         }
         fetchTables(); // Refresh the list
       } else {
@@ -142,7 +160,38 @@ export default function Tables() {
     } catch (error) {
       console.error('Error deleting table:', error);
       if (window.showToast) {
-        window.showToast('Failed to delete table', 'error', 4000);
+        window.showToast(`Failed to delete table: ${error.message}`, 'error', 5000);
+      }
+    }
+  };
+
+  const handleDeactivateTable = async (tableId) => {
+    if (!confirm('This will deactivate the table (soft delete). The table will no longer be available for reservations but can be reactivated later.\n\nProceed with deactivation?')) {
+      return;
+    }
+
+    try {
+      if (window.showToast) {
+        window.showToast('Deactivating table...', 'info', 2000);
+      }
+
+      const response = await fetch(`http://localhost:3003/api/admin/tables/${tableId}/deactivate`, {
+        method: 'PUT'
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        if (window.showToast) {
+          window.showToast('Table deactivated successfully! ⏸️', 'success', 3000);
+        }
+        fetchTables(); // Refresh the list
+      } else {
+        throw new Error(data.error || 'Failed to deactivate table');
+      }
+    } catch (error) {
+      console.error('Error deactivating table:', error);
+      if (window.showToast) {
+        window.showToast(`Failed to deactivate table: ${error.message}`, 'error', 4000);
       }
     }
   };
@@ -150,6 +199,7 @@ export default function Tables() {
 
 
   const handleEditTable = (table) => {
+    console.log('🔍 handleEditTable called with table:', table);
     setEditingTable(table);
     setShowEditTableModal(true);
   };
@@ -345,6 +395,11 @@ export default function Tables() {
             </Card>
           </div>
 
+          {/* Table Reservations Widget */}
+          <div className="mb-8">
+            <TableReservationsWidget />
+          </div>
+
           {/* Tables Grid */}
           <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl">
             <CardHeader>
@@ -418,26 +473,44 @@ export default function Tables() {
                         )}
                       </div>
 
-                      <div className="mt-3 flex space-x-2">
-
+                      <div className="mt-3 flex flex-col space-y-2">
+                        {/* Edit Button */}
                         <Button 
                           variant="outline" 
                           size="sm" 
                           onClick={() => handleEditTable(table)}
-                          className="flex-1 text-xs border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900/20"
+                          className="w-full text-xs border-blue-200 dark:border-blue-600 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                         >
                           <Edit className="h-3 w-3 mr-1" />
                           Edit
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleDeleteTable(table.id)}
-                          className="flex-1 text-xs border-red-200 dark:border-red-600 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
-                        >
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Delete
-                        </Button>
+                        
+                        {/* Action Buttons Row */}
+                        <div className="flex space-x-2">
+                          {/* Deactivate Button (for active tables) */}
+                          {table.is_active && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleDeactivateTable(table.id)}
+                              className="flex-1 text-xs border-orange-200 dark:border-orange-600 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                            >
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Deactivate
+                            </Button>
+                          )}
+                          
+                          {/* Delete Button */}
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleDeleteTable(table.id)}
+                            className="flex-1 text-xs border-red-200 dark:border-red-600 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -461,12 +534,21 @@ export default function Tables() {
           <EditTableModal
             isOpen={showEditTableModal}
             onClose={() => {
+              console.log('🔍 Closing edit modal, clearing editingTable');
               setShowEditTableModal(false);
               setEditingTable(null);
             }}
             onSubmit={(updates) => handleUpdateTable(editingTable.id, updates)}
             table={editingTable}
           />
+        )}
+        
+        {/* Debug info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="fixed bottom-4 right-4 bg-black text-white p-2 text-xs rounded opacity-75">
+            Modal: {showEditTableModal ? 'Open' : 'Closed'}<br/>
+            Editing: {editingTable ? `Table ${editingTable.id}` : 'None'}
+          </div>
         )}
       </div>
     </Layout>
