@@ -19,6 +19,8 @@ router.get('/', async (req, res) => {
   try {
     const { 
       date, 
+      start_date,
+      end_date,
       status, 
       table_id, 
       customer_name, 
@@ -33,7 +35,13 @@ router.get('/', async (req, res) => {
     let paramCount = 0;
     
     // Add filters
-    if (date) {
+    if (start_date && end_date) {
+      paramCount++;
+      whereClause += ` AND tr.reservation_date BETWEEN $${paramCount} AND $${paramCount + 1}`;
+      params.push(start_date);
+      params.push(end_date);
+      paramCount++; // Increment again for the second parameter
+    } else if (date) {
       paramCount++;
       whereClause += ` AND tr.reservation_date = $${paramCount}`;
       params.push(date);
@@ -85,6 +93,7 @@ router.get('/', async (req, res) => {
         tr.arrival_notes,
         tr.created_at,
         tr.updated_at,
+        tr.table_id,
         rt.table_number,
         rt.name as table_name,
         rt.capacity as table_capacity,
@@ -325,6 +334,7 @@ router.get('/calendar', async (req, res) => {
         tr.grace_period_minutes,
         tr.max_sitting_minutes,
         tr.reservation_end_time,
+        tr.table_id,
         rt.table_number,
         rt.name as table_name,
         rt.capacity as table_capacity,
@@ -387,6 +397,7 @@ router.get('/today', async (req, res) => {
         tr.grace_period_minutes,
         tr.max_sitting_minutes,
         tr.reservation_end_time,
+        tr.table_id,
         rt.table_number,
         rt.name as table_name,
         rt.capacity as table_capacity,
@@ -522,6 +533,74 @@ router.put('/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update reservation',
+      details: error.message
+    });
+  }
+});
+
+// PUT /api/admin/reservations/:id/status - Update reservation status only
+router.put('/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status is required'
+      });
+    }
+    
+    // Validate status values
+    const validStatuses = ['confirmed', 'seated', 'completed', 'cancelled', 'no_show'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid status',
+        details: `Status must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+    
+    const client = await pool.connect();
+    
+    // Check if reservation exists
+    const existingReservation = await client.query(
+      'SELECT * FROM table_reservations WHERE id = $1',
+      [id]
+    );
+    
+    if (existingReservation.rows.length === 0) {
+      client.release();
+      return res.status(404).json({
+        success: false,
+        error: 'Reservation not found'
+      });
+    }
+    
+    // Update only the status
+    const query = `
+      UPDATE table_reservations 
+      SET 
+        status = $1,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `;
+    
+    const result = await client.query(query, [status, id]);
+    client.release();
+    
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Reservation status updated successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error updating reservation status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update reservation status',
       details: error.message
     });
   }

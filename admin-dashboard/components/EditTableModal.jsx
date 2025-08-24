@@ -28,15 +28,21 @@ export default function EditTableModal({ isOpen, onClose, onSubmit, table }) {
       console.log('🔍 EditTableModal setting form data:', newFormData);
       setFormData(newFormData);
     }
-  }, [table]);
+  }, [table?.id]); // Only re-run when table ID changes
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    console.log('🔍 EditTableModal submitting form data:', formData);
     onSubmit(formData);
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    console.log('🔍 EditTableModal handleChange:', field, value, 'Previous state:', formData);
+    setFormData(prev => {
+      const newState = { ...prev, [field]: value };
+      console.log('🔍 EditTableModal new state:', newState);
+      return newState;
+    });
   };
 
   if (!isOpen || !table) return null;
@@ -117,8 +123,13 @@ export default function EditTableModal({ isOpen, onClose, onSubmit, table }) {
             <div>
               <Label htmlFor="is_active">Table Status</Label>
               <Select
-                value={formData.is_active.toString()}
-                onValueChange={(value) => handleChange('is_active', value === 'true')}
+                key={`status-${formData.is_active}`}
+                value={formData.is_active ? "true" : "false"}
+                defaultValue={formData.is_active ? "true" : "false"}
+                onValueChange={(value) => {
+                  console.log('🔍 Select onValueChange:', value, typeof value);
+                  handleChange('is_active', value === 'true');
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select status" />
@@ -130,6 +141,9 @@ export default function EditTableModal({ isOpen, onClose, onSubmit, table }) {
               </Select>
               <p className="text-sm text-gray-500 mt-1">
                 Active tables can receive reservations. Inactive tables are temporarily removed from the reservation system.
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Current value: {formData.is_active ? "Active" : "Inactive"} (Debug: {formData.is_active.toString()})
               </p>
             </div>
 

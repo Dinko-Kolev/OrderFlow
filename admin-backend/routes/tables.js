@@ -235,9 +235,9 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect();
     
-    // Check if table has any reservations
+    // Check if table has any active reservations (only confirmed or seated reservations should prevent deletion)
     const reservationsCheck = await client.query(
-      'SELECT COUNT(*) FROM table_reservations WHERE table_id = $1',
+      'SELECT COUNT(*) FROM table_reservations WHERE table_id = $1 AND status IN (\'confirmed\', \'seated\')',
       [id]
     );
     
@@ -281,6 +281,10 @@ router.delete('/:id', async (req, res) => {
     });
   }
 });
+
+
+
+
 
 // GET /api/admin/tables/:id - Get specific table details
 router.get('/:id', async (req, res) => {

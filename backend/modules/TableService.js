@@ -81,28 +81,45 @@ class TableService {
 
   /**
    * Check table availability for specific date and time
+   * This method checks for time overlaps with existing reservations
    */
   async checkTableAvailability(tableId, date, time) {
     try {
+      // Convert time to minutes for easier comparison
+      const [hours, minutes] = time.split(':').map(Number);
+      const requestedTimeMinutes = hours * 60 + minutes;
+      
+      // Check for overlapping reservations
       const result = await this.dbPool.query(
-        `SELECT ta.is_available, tr.customer_name, tr.number_of_guests
-         FROM table_availability ta
-         LEFT JOIN table_reservations tr ON ta.reservation_id = tr.id
-         WHERE ta.table_id = $1 AND ta.reservation_date = $2 AND ta.reservation_time = $3`,
+        `SELECT tr.customer_name, tr.number_of_guests, tr.reservation_time, tr.reservation_end_time
+         FROM table_reservations tr
+         WHERE tr.table_id = $1 
+           AND tr.reservation_date = $2 
+           AND tr.status NOT IN ('cancelled', 'completed', 'no_show')
+           AND (
+             -- Check if requested time falls within an existing reservation
+             ($3::time >= tr.reservation_time AND $3::time < tr.reservation_end_time)
+             OR
+             -- Check if existing reservation starts during the requested time slot
+             (tr.reservation_time >= $3::time AND tr.reservation_time < ($3::time + INTERVAL '105 minutes'))
+           )`,
         [tableId, date, time]
       )
       
       if (result.rows.length === 0) {
-        // No availability record exists, table is available
+        // No overlapping reservations found, table is available
         return { isAvailable: true, existingReservation: null }
       }
       
-      const availability = result.rows[0]
+      // Table is not available due to overlapping reservation
+      const existingReservation = result.rows[0]
       return {
-        isAvailable: availability.is_available,
-        existingReservation: availability.is_available ? null : {
-          customerName: availability.customer_name,
-          numberOfGuests: availability.number_of_guests
+        isAvailable: false,
+        existingReservation: {
+          customerName: existingReservation.customer_name,
+          numberOfGuests: existingReservation.number_of_guests,
+          startTime: existingReservation.reservation_time,
+          endTime: existingReservation.reservation_end_time
         }
       }
     } catch (error) {
@@ -156,23 +173,18 @@ class TableService {
 
   /**
    * Reserve table for specific date and time
+   * Note: This method is kept for compatibility but table_availability is no longer used
+   * Availability is now checked directly from table_reservations
    */
   async reserveTable(tableId, date, time, reservationId) {
     try {
-      // Insert or update availability record
-      const result = await this.dbPool.query(
-        `INSERT INTO table_availability (table_id, reservation_date, reservation_time, is_available, reservation_id)
-         VALUES ($1, $2, $3, false, $4)
-         ON CONFLICT (table_id, reservation_date, reservation_time)
-         DO UPDATE SET 
-           is_available = false,
-           reservation_id = $4,
-           updated_at = CURRENT_TIMESTAMP
-         RETURNING *`,
-        [tableId, date, time, reservationId]
-      )
+      // Since we're now checking availability directly from table_reservations,
+      // we don't need to maintain a separate table_availability table
+      // The reservation itself in table_reservations serves as the availability record
       
-      return result.rows[0]
+      console.log(`✅ Table ${tableId} reserved for ${date} at ${time} (reservation ID: ${reservationId})`)
+      
+      return { success: true, tableId, date, time, reservationId }
     } catch (error) {
       console.error('Error reserving table:', error)
       throw new Error('Failed to reserve table')
@@ -244,9 +256,9 @@ class TableService {
   }
 
   /**
-   * Get time slot availability for a specific date
+   * Get time slot availability for a specific date and party size
    */
-  async getTimeSlotAvailability(date) {
+  async getTimeSlotAvailability(date, partySize = 2) {
     try {
       const allTimeSlots = [
         '12:00:00', '12:30:00', '13:00:00', '13:30:00', '14:00:00', '14:30:00',
@@ -256,7 +268,7 @@ class TableService {
       const availability = []
       
       for (const timeSlot of allTimeSlots) {
-        const availableTables = await this.getAvailableTablesForTimeSlot(date, timeSlot)
+        const availableTables = await this.getAvailableTablesForTimeSlot(date, timeSlot, partySize)
         const totalCapacity = availableTables.reduce((sum, table) => sum + table.capacity, 0)
         
         availability.push({
@@ -275,22 +287,29 @@ class TableService {
   }
 
   /**
-   * Get available tables for a specific time slot
+   * Get available tables for a specific time slot and party size
+   * This method checks for time overlaps with existing reservations
    */
-  async getAvailableTablesForTimeSlot(date, time) {
+  async getAvailableTablesForTimeSlot(date, time, partySize = 2) {
     try {
-      const result = await this.dbPool.query(
-        `SELECT rt.*
-         FROM restaurant_tables rt
-         LEFT JOIN table_availability ta ON rt.id = ta.table_id 
-           AND ta.reservation_date = $1 AND ta.reservation_time = $2
-         WHERE rt.is_active = true 
-           AND (ta.is_available IS NULL OR ta.is_available = true)
-         ORDER BY rt.capacity ASC`,
-        [date, time]
-      )
+      // Get all active tables that can accommodate the party
+      const allTables = await this.getAllTables()
+      const availableTables = []
       
-      return result.rows.map(row => new RestaurantTable(row))
+      for (const table of allTables) {
+        // Check if table can accommodate the party size
+        if (!table.canAccommodate(partySize)) {
+          continue
+        }
+        
+        // Check if table is available at this specific time
+        const availability = await this.checkTableAvailability(table.id, date, time)
+        if (availability.isAvailable) {
+          availableTables.push(table)
+        }
+      }
+      
+      return availableTables
     } catch (error) {
       console.error('Error getting available tables for time slot:', error)
       throw new Error('Failed to get available tables')

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { XCircle, AlertCircle } from 'lucide-react'
+import api from '../../frontend/lib/api'
 
 const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
   const { isDarkMode } = useTheme();
@@ -17,6 +18,8 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
   })
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [availableSlots, setAvailableSlots] = useState([])
+  const [loadingAvailability, setLoadingAvailability] = useState(false)
 
   // Safe toast usage (works even if no provider wraps the component in tests)
   let toastApi = { showToast: () => {}, hideToast: () => {} }
@@ -46,34 +49,95 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
     { value: '22:00:00', label: '10:00 PM' },
   ]
 
-  // Filter tables based on guest count
+  // Check availability when date, time, or guest count changes
+  useEffect(() => {
+    if (formData.reservation_date && formData.reservation_time && formData.number_of_guests) {
+      setLoadingAvailability(true)
+      
+      // Convert time format from HH:MM:SS to HH:MM for API
+      const timeForAPI = formData.reservation_time.substring(0, 5)
+      
+      api.reservations.getAvailability(formData.reservation_date, parseInt(formData.number_of_guests))
+        .then(result => {
+          if (result.success) {
+            setAvailableSlots(result.data)
+            
+            // If previously selected time is no longer available, reset it
+            if (formData.reservation_time && !result.data.find(slot => slot.time === timeForAPI)?.available) {
+              setFormData(prev => ({ ...prev, reservation_time: '' }))
+            }
+          } else {
+            console.error('Error fetching availability:', result.error)
+            setAvailableSlots([])
+          }
+        })
+        .catch(error => {
+          console.error('Error checking availability:', error)
+          setAvailableSlots([])
+        })
+        .finally(() => setLoadingAvailability(false))
+    } else {
+      setAvailableSlots([])
+    }
+  }, [formData.reservation_date, formData.reservation_time, formData.number_of_guests])
+
+  // Filter tables based on guest count AND availability
   const getAvailableTables = () => {
-    if (!formData.number_of_guests) {
+    if (!formData.number_of_guests || !formData.reservation_date || !formData.reservation_time) {
       return tables.filter(table => table.is_active)
     }
+    
     const guestCount = parseInt(formData.number_of_guests, 10)
     if (Number.isNaN(guestCount)) return tables.filter(table => table.is_active)
-    return tables.filter(table => table.is_active && table.capacity >= guestCount)
+    
+    // First filter by capacity
+    const capacityFilteredTables = tables.filter(table => table.is_active && table.capacity >= guestCount)
+    
+    // If we have availability data, filter by actual availability
+    if (availableSlots.length > 0) {
+      const timeForAPI = formData.reservation_time.substring(0, 5)
+      const currentSlot = availableSlots.find(slot => slot.time === timeForAPI)
+      
+      if (currentSlot && !currentSlot.available) {
+        // No tables available at this time, return empty array
+        return []
+      }
+    }
+    
+    return capacityFilteredTables
   }
 
-  // Get availability warning for current party size
+  // Get availability warning for current party size and time
   const getAvailabilityWarning = () => {
     if (!formData.number_of_guests) return null;
     
     const guestCount = parseInt(formData.number_of_guests, 10);
     if (Number.isNaN(guestCount)) return null;
     
+    // If we have availability data and a specific time is selected
+    if (availableSlots.length > 0 && formData.reservation_time) {
+      const timeForAPI = formData.reservation_time.substring(0, 5)
+      const currentSlot = availableSlots.find(slot => slot.time === timeForAPI)
+      
+      if (currentSlot && !currentSlot.available) {
+        return {
+          type: 'error',
+          message: `No tables available for ${guestCount} guests at ${timeForAPI}. Please select a different time.`
+        };
+      }
+    }
+    
     const availableTables = getAvailableTables();
     
     if (availableTables.length === 0) {
       return {
         type: 'error',
-        message: `No tables available for ${guestCount} guests. Please try a different party size or contact staff.`
+        message: `No tables available for ${guestCount} guests at the selected time. Please try a different time or party size.`
       };
     } else if (availableTables.length <= 1) {
       return {
         type: 'warning',
-        message: `Limited availability for ${guestCount} guests (${availableTables.length} table available)`
+        message: `Limited availability for ${guestCount} guests at the selected time (${availableTables.length} table available)`
       };
     }
     
@@ -83,7 +147,8 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
   // Check if form can be submitted
   const canSubmitForm = () => {
     const warning = getAvailabilityWarning();
-    return !warning || warning.type !== 'error';
+    const hasAvailableTables = availableTables.length > 0;
+    return (!warning || warning.type !== 'error') && hasAvailableTables;
   };
 
   // Reset form when modal opens/closes
@@ -427,11 +492,22 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
 
             <div className="mb-4">
               <label htmlFor="table_id" className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                Table * {availableTables.length > 0 && (
+                Table * 
+                {loadingAvailability && (
+                  <span className="text-xs font-normal text-blue-600 dark:text-blue-400 ml-2">
+                    (Checking availability...)
+                  </span>
+                )}
+                {!loadingAvailability && availableTables.length > 0 && (
                   <span className={`text-xs font-normal ${
                     availableTables.length <= 1 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'
                   }`}>
                     ({availableTables.length} table{availableTables.length !== 1 ? 's' : ''} available)
+                  </span>
+                )}
+                {!loadingAvailability && availableTables.length === 0 && formData.reservation_date && formData.reservation_time && formData.number_of_guests && (
+                  <span className="text-xs font-normal text-red-600 dark:text-red-400 ml-2">
+                    (No tables available at selected time)
                   </span>
                 )}
               </label>
@@ -441,13 +517,18 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
                 value={formData.table_id}
                 onChange={handleInputChange}
                 required
+                disabled={loadingAvailability || availableTables.length === 0}
                 className={`w-full p-2 border rounded transition-colors ${
                   isDarkMode 
                     ? 'bg-slate-700 border-slate-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' 
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500'
-                }`}
+                } ${(loadingAvailability || availableTables.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <option value="">Select a table</option>
+                <option value="">
+                  {loadingAvailability ? 'Checking availability...' : 
+                   availableTables.length === 0 ? 'No tables available at selected time' : 
+                   'Select a table'}
+                </option>
                 {availableTables.map(table => (
                   <option
                     key={table.id}

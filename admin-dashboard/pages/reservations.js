@@ -97,6 +97,13 @@ export default function Reservations() {
     fetchReservations(1);
     fetchRestaurantConfig();
     fetchTables();
+  }, []); // Only run once on mount
+
+  // Fetch reservations when filters change
+  useEffect(() => {
+    if (searchTerm || statusFilter !== 'all' || dateFilter) {
+      fetchReservations(1);
+    }
   }, [searchTerm, statusFilter, dateFilter]);
 
   const fetchTables = async () => {
@@ -159,32 +166,7 @@ export default function Reservations() {
     }
   };
 
-  const handleUpdateReservation = async (reservationId, updates) => {
-    try {
-      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
 
-      const data = await response.json();
-      if (data.success) {
-        if (window.showToast) {
-          window.showToast('Reservation updated successfully', 'success', 2000);
-        }
-        setShowEditReservationModal(false);
-        setEditingReservation(null);
-        fetchReservations(currentPage);
-      } else {
-        throw new Error(data.error || 'Failed to update reservation');
-      }
-    } catch (error) {
-      console.error('Error updating reservation:', error);
-      if (window.showToast) {
-        window.showToast('Failed to update reservation', 'error', 4000);
-      }
-    }
-  };
 
 
 
@@ -239,19 +221,24 @@ export default function Reservations() {
 
   const handleStatusUpdate = async (reservationId, newStatus) => {
     try {
-      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}`, {
+      console.log('🔍 Updating reservation status:', { reservationId, newStatus });
+      
+      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
       });
 
-      if (response.ok) {
+      const data = await response.json();
+      console.log('🔍 Status update response:', data);
+
+      if (response.ok && data.success) {
         if (window.showToast) {
           window.showToast(`Reservation status updated to ${newStatus}`, 'success', 2000);
         }
         fetchReservations(currentPage); // Refresh the list
       } else {
-        throw new Error('Failed to update status');
+        throw new Error(data.error || 'Failed to update status');
       }
     } catch (error) {
       console.error('Error updating reservation status:', error);
@@ -261,38 +248,63 @@ export default function Reservations() {
     }
   };
 
-  const handleDeleteReservation = async (reservationId) => {
-    if (!confirm('Are you sure you want to delete this reservation? This action cannot be undone.')) {
+  const handleCancelReservation = async (reservationId) => {
+    if (!confirm('Are you sure you want to cancel this reservation? This will mark it as cancelled but keep the record.')) {
       return;
     }
 
     try {
-      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}`, {
-        method: 'DELETE'
+      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled' })
       });
 
       if (response.ok) {
         if (window.showToast) {
-          window.showToast('Reservation deleted successfully', 'success', 2000);
+          window.showToast('Reservation cancelled successfully', 'success', 2000);
         }
         fetchReservations(currentPage); // Refresh the list
       } else {
-        throw new Error('Failed to delete reservation');
+        throw new Error('Failed to cancel reservation');
       }
     } catch (error) {
-      console.error('Error deleting reservation:', error);
+      console.error('Error cancelling reservation:', error);
       if (window.showToast) {
-        window.showToast('Failed to delete reservation', 'error', 4000);
+        window.showToast('Failed to cancel reservation', 'error', 5000);
       }
     }
   };
 
-  const handleViewReservation = (reservation) => {
-    // For now, just show details in console. Could be expanded to a modal
-    console.log('Viewing reservation:', reservation);
-    if (window.showToast) {
-      window.showToast(`Viewing reservation for ${reservation.customer_name}`, 'info', 2000);
+  const handleUpdateReservation = async (reservationId, updates) => {
+    try {
+      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+
+      if (response.ok) {
+        if (window.showToast) {
+          window.showToast('Reservation updated successfully', 'success', 2000);
+        }
+        setShowEditReservationModal(false);
+        setEditingReservation(null);
+        fetchReservations(currentPage); // Refresh the list
+      } else {
+        throw new Error('Failed to update reservation');
+      }
+    } catch (error) {
+      console.error('Error updating reservation:', error);
+      if (window.showToast) {
+        window.showToast('Failed to update reservation', 'error', 5000);
+      }
     }
+  };
+
+  const handleEditReservation = (reservation) => {
+    setEditingReservation(reservation);
+    setShowEditReservationModal(true);
   };
 
   const handleSearch = (e) => {
@@ -913,14 +925,7 @@ export default function Reservations() {
                           
                           <TableCell>
                             <div className="flex items-center space-x-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => handleViewReservation(reservation)}
-                                className="border-blue-200 dark:border-blue-600 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                              >
-                                <Eye className="h-3 w-3" />
-                              </Button>
+
                               
                               <Button 
                                 variant="outline" 
@@ -950,10 +955,11 @@ export default function Reservations() {
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="border-red-200 dark:border-red-600 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                onClick={() => handleDeleteReservation(reservation.id)}
+                                className="border-orange-200 dark:border-orange-600 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                                onClick={() => handleCancelReservation(reservation.id)}
+                                title="Cancel Reservation"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <XCircle className="h-3 w-3" />
                               </Button>
                             </div>
                           </TableCell>

@@ -212,7 +212,13 @@ export const api = {
   // Reservations endpoints  
   reservations: {
     create: (reservationData) => apiClient.post('/api/reservations', reservationData),
-    getAvailability: (date) => apiClient.get(`/api/reservations/availability/${date}`),
+    getAvailability: (date, guests) => {
+      const params = new URLSearchParams()
+      if (guests) params.append('guests', guests)
+      return apiClient.get(`/api/reservations/availability/${date}?${params.toString()}`, {
+        cache: false // Disable cache for real-time availability
+      })
+    },
     getTableOverview: (date) => apiClient.get(`/api/reservations/tables/${date}`),
     getUserReservations: () => apiClient.get('/api/reservations/user', {
       headers: apiClient.getAuthHeaders()

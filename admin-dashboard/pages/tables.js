@@ -82,6 +82,7 @@ export default function Tables() {
 
   const handleCreateTable = async (tableData) => {
     try {
+      console.log('🔍 handleCreateTable called with:', tableData);
       const response = await fetch('http://localhost:3003/api/admin/tables', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,6 +90,7 @@ export default function Tables() {
       });
 
       const data = await response.json();
+      console.log('🔍 handleCreateTable API response:', data);
       if (data.success) {
         if (window.showToast) {
           window.showToast('Table created successfully! 🎉', 'success', 3000);
@@ -108,6 +110,7 @@ export default function Tables() {
 
   const handleUpdateTable = async (tableId, updates) => {
     try {
+      console.log('🔍 handleUpdateTable called with:', { tableId, updates });
       const response = await fetch(`http://localhost:3003/api/admin/tables/${tableId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -115,6 +118,7 @@ export default function Tables() {
       });
 
       const data = await response.json();
+      console.log('🔍 handleUpdateTable API response:', data);
       if (data.success) {
         if (window.showToast) {
           window.showToast('Table updated successfully! ✨', 'success', 3000);
