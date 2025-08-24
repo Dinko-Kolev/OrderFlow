@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { XCircle, AlertCircle } from 'lucide-react'
-import api from '../../frontend/lib/api'
 
 const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
   const { isDarkMode } = useTheme();
@@ -57,7 +56,9 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
       // Convert time format from HH:MM:SS to HH:MM for API
       const timeForAPI = formData.reservation_time.substring(0, 5)
       
-      api.reservations.getAvailability(formData.reservation_date, parseInt(formData.number_of_guests))
+      // Direct fetch call to backend availability endpoint
+      fetch(`http://localhost:3001/api/reservations/availability/${formData.reservation_date}?guests=${parseInt(formData.number_of_guests)}`)
+        .then(response => response.json())
         .then(result => {
           if (result.success) {
             setAvailableSlots(result.data)

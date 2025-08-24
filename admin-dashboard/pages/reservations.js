@@ -303,8 +303,10 @@ export default function Reservations() {
   };
 
   const handleEditReservation = (reservation) => {
+    console.log('🔍 Edit button clicked for reservation:', reservation);
     setEditingReservation(reservation);
     setShowEditReservationModal(true);
+    console.log('🔍 Modal state set to true, editingReservation:', reservation);
   };
 
   const handleSearch = (e) => {
@@ -561,6 +563,7 @@ export default function Reservations() {
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
                     className="w-full"
+                    max={new Date().toISOString().split('T')[0]}
                   />
                 </div>
                 
@@ -938,10 +941,13 @@ export default function Reservations() {
                               
                               <Select 
                                 value={reservation.status} 
-                                onValueChange={(value) => handleStatusUpdate(reservation.id, value)}
+                                onValueChange={(value) => {
+                                  console.log('🔍 Status change:', { reservationId: reservation.id, oldStatus: reservation.status, newStatus: value });
+                                  handleStatusUpdate(reservation.id, value);
+                                }}
                               >
                                 <SelectTrigger className="w-32">
-                                  <SelectValue />
+                                  <SelectValue placeholder={reservation.status} />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="confirmed">Confirmed</SelectItem>
@@ -1015,6 +1021,7 @@ export default function Reservations() {
           <EditReservationModal
             isOpen={showEditReservationModal}
             onClose={() => {
+              console.log('🔍 Closing edit modal');
               setShowEditReservationModal(false);
               setEditingReservation(null);
             }}
@@ -1022,6 +1029,14 @@ export default function Reservations() {
             reservation={editingReservation}
             tables={tables}
           />
+        )}
+        
+        {/* Debug info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="fixed bottom-4 right-4 bg-black/80 text-white p-2 rounded text-xs">
+            Modal: {showEditReservationModal ? 'Open' : 'Closed'}<br/>
+            Editing: {editingReservation ? `ID: ${editingReservation.id}` : 'None'}
+          </div>
         )}
 
 

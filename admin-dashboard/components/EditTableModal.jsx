@@ -123,9 +123,7 @@ export default function EditTableModal({ isOpen, onClose, onSubmit, table }) {
             <div>
               <Label htmlFor="is_active">Table Status</Label>
               <Select
-                key={`status-${formData.is_active}`}
-                value={formData.is_active ? "true" : "false"}
-                defaultValue={formData.is_active ? "true" : "false"}
+                value={formData.is_active.toString()}
                 onValueChange={(value) => {
                   console.log('🔍 Select onValueChange:', value, typeof value);
                   handleChange('is_active', value === 'true');
@@ -141,9 +139,6 @@ export default function EditTableModal({ isOpen, onClose, onSubmit, table }) {
               </Select>
               <p className="text-sm text-gray-500 mt-1">
                 Active tables can receive reservations. Inactive tables are temporarily removed from the reservation system.
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Current value: {formData.is_active ? "Active" : "Inactive"} (Debug: {formData.is_active.toString()})
               </p>
             </div>
 

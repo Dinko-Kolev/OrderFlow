@@ -3,7 +3,14 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 
 const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables = [] }) => {
-  const { isDarkMode } = useTheme();
+  // Safe theme usage (works even if no provider wraps the component)
+  let themeApi = { isDarkMode: false }
+  try {
+    themeApi = useTheme()
+  } catch (e) {
+    // ignore - fallback to light theme
+  }
+  const { isDarkMode } = themeApi
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_email: '',
@@ -20,7 +27,14 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { showToast } = useToast()
+  // Safe toast usage (works even if no provider wraps the component in tests)
+  let toastApi = { showToast: () => {}, hideToast: () => {} }
+  try {
+    toastApi = useToast()
+  } catch (e) {
+    // ignore - fallback no-op toast
+  }
+  const { showToast } = toastApi
 
   // Available time slots for lunch and dinner
   const timeSlots = [
@@ -43,6 +57,8 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
 
   // Set reservation data when modal opens
   useEffect(() => {
+    console.log('🔍 EditReservationModal useEffect:', { isOpen, reservation })
+    
     if (isOpen && reservation) {
       setCurrentReservation(reservation)
       
@@ -51,7 +67,7 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
         customer_name: reservation.customer_name || '',
         customer_email: reservation.customer_email || '',
         customer_phone: reservation.customer_phone || '',
-        reservation_date: reservation.reservation_date || '',
+        reservation_date: reservation.reservation_date ? reservation.reservation_date.split('T')[0] : '',
         reservation_time: reservation.reservation_time || '',
         number_of_guests: reservation.number_of_guests || 1,
         table_id: reservation.table_id ? String(reservation.table_id) : '',
@@ -59,6 +75,7 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
         status: reservation.status || 'confirmed',
       }
       
+      console.log('🔍 Setting form data:', newFormData)
       setFormData(newFormData)
     }
   }, [isOpen, reservation])
@@ -185,6 +202,8 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
 
   if (!isOpen) return null
 
+  console.log('🔍 EditReservationModal render:', { isOpen, reservation, formData })
+  
   const availableTables = getAvailableTables()
 
 
@@ -204,7 +223,7 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
         </div>
         
         <div role="dialog" aria-labelledby="modal-title">
-          {reservation && (
+          {reservation ? (
             <>
               {/* Status and Duration Information */}
               <div className={`mb-6 p-4 rounded ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
@@ -293,7 +312,7 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
                 </div>
 
                 <div className="mb-4">
-                  <label htmlFor="number_of_guests" className="block text-sm font-medium mb-2">
+                  <label htmlFor="number_of_guests" className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                     Number of Guests *
                   </label>
                   <input
@@ -305,15 +324,19 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
                     value={formData.number_of_guests}
                     onChange={handleInputChange}
                     required
-                    className="w-full p-2 border border-gray-300 rounded"
+                    className={`w-full p-2 border rounded transition-colors ${
+                      isDarkMode 
+                        ? 'bg-slate-700 border-slate-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' 
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500'
+                    }`}
                   />
                   {errors.number_of_guests && (
-                    <div className="text-red-600 text-sm mt-1">{errors.number_of_guests}</div>
+                    <div className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.number_of_guests}</div>
                   )}
                 </div>
 
                 <div className="mb-4">
-                  <label htmlFor="reservation_date" className="block text-sm font-medium mb-2">
+                  <label htmlFor="reservation_date" className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                     Date *
                   </label>
                   <input
@@ -323,15 +346,19 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
                     value={formData.reservation_date}
                     onChange={handleInputChange}
                     required
-                    className="w-full p-2 border border-gray-300 rounded"
+                    className={`w-full p-2 border rounded transition-colors ${
+                      isDarkMode 
+                        ? 'bg-slate-700 border-slate-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' 
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500'
+                    }`}
                   />
                   {errors.reservation_date && (
-                    <div className="text-red-600 text-sm mt-1">{errors.reservation_date}</div>
+                    <div className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.reservation_date}</div>
                   )}
                 </div>
 
                 <div className="mb-4">
-                  <label htmlFor="reservation_time" className="block text-sm font-medium mb-2">
+                  <label htmlFor="reservation_time" className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                     Time *
                   </label>
                   <input
@@ -341,15 +368,19 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
                     value={formData.reservation_time || ''}
                     onChange={handleInputChange}
                     required
-                    className="w-full p-2 border border-gray-300 rounded"
+                    className={`w-full p-2 border rounded transition-colors ${
+                      isDarkMode 
+                        ? 'bg-slate-700 border-slate-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' 
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500'
+                    }`}
                   />
                   {errors.reservation_time && (
-                    <div className="text-red-600 text-sm mt-1">{errors.reservation_time}</div>
+                    <div className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.reservation_time}</div>
                   )}
                 </div>
 
                 <div className="mb-4">
-                  <label htmlFor="table_id" className="block text-sm font-medium mb-2">
+                  <label htmlFor="table_id" className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                     Table *
                   </label>
                   <select
@@ -358,11 +389,15 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
                     value={formData.table_id || ''}
                     onChange={handleInputChange}
                     required
-                    className="w-full p-2 border border-gray-300 rounded"
+                    className={`w-full p-2 border rounded transition-colors ${
+                      isDarkMode 
+                        ? 'bg-slate-700 border-slate-600 text-white focus:border-blue-500 focus:ring-blue-500' 
+                        : 'bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500'
+                    }`}
                   >
                     <option value="">Select a table</option>
                     {availableTables.map(table => (
-                      <option key={table.id} value={String(table.id)}>
+                      <option key={table.id} value={String(table.id)} className={isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-gray-900'}>
                         Table {table.table_number} ({table.capacity} seats)
                       </option>
                     ))}
@@ -376,12 +411,12 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
                     style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }}
                   />
                   {errors.table_id && (
-                    <div className="text-red-600 text-sm mt-1">{errors.table_id}</div>
+                    <div className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.table_id}</div>
                   )}
                 </div>
 
                 <div className="mb-4">
-                  <label htmlFor="status" className="block text-sm font-medium mb-2">
+                  <label htmlFor="status" className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                     Status *
                   </label>
                   <select
@@ -390,21 +425,25 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
                     value={formData.status || 'confirmed'}
                     onChange={handleInputChange}
                     required
-                    className="w-full p-2 border border-gray-300 rounded"
+                    className={`w-full p-2 border rounded transition-colors ${
+                      isDarkMode 
+                        ? 'bg-slate-700 border-slate-600 text-white focus:border-blue-500 focus:ring-blue-500' 
+                        : 'bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500'
+                    }`}
                   >
-                    <option value="confirmed" onClick={() => setFormData(prev => ({ ...prev, status: 'confirmed' }))}>confirmed</option>
-                    <option value="pending" onClick={() => setFormData(prev => ({ ...prev, status: 'pending' }))}>pending</option>
-                    <option value="cancelled" onClick={() => setFormData(prev => ({ ...prev, status: 'cancelled' }))}>cancelled</option>
-                    <option value="seated" onClick={() => setFormData(prev => ({ ...prev, status: 'seated' }))}>seated</option>
-                    <option value="departed" onClick={() => setFormData(prev => ({ ...prev, status: 'departed' }))}>departed</option>
+                    <option value="confirmed" onClick={() => setFormData(prev => ({ ...prev, status: 'confirmed' }))} className={isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-gray-900'}>confirmed</option>
+                    <option value="pending" onClick={() => setFormData(prev => ({ ...prev, status: 'pending' }))} className={isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-gray-900'}>pending</option>
+                    <option value="cancelled" onClick={() => setFormData(prev => ({ ...prev, status: 'cancelled' }))} className={isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-gray-900'}>cancelled</option>
+                    <option value="seated" onClick={() => setFormData(prev => ({ ...prev, status: 'seated' }))} className={isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-gray-900'}>seated</option>
+                    <option value="departed" onClick={() => setFormData(prev => ({ ...prev, status: 'departed' }))} className={isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-gray-900'}>departed</option>
                   </select>
                   {errors.status && (
-                    <div className="text-red-600 text-sm mt-1">{errors.status}</div>
+                    <div className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.status}</div>
                   )}
                 </div>
 
                 <div className="mb-4 col-span-full">
-                  <label htmlFor="special_requests" className="block text-sm font-medium mb-2">
+                  <label htmlFor="special_requests" className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                     Special Requests
                   </label>
                   <textarea
@@ -413,7 +452,11 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
                     value={formData.special_requests}
                     onChange={handleInputChange}
                     rows="3"
-                    className="w-full p-2 border border-gray-300 rounded"
+                    className={`w-full p-2 border rounded transition-colors ${
+                      isDarkMode 
+                        ? 'bg-slate-700 border-slate-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' 
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500'
+                    }`}
                   />
                 </div>
 
@@ -421,14 +464,22 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                    className={`px-4 py-2 border rounded transition-colors ${
+                      isDarkMode 
+                        ? 'text-gray-300 border-slate-600 hover:bg-slate-700 hover:text-white' 
+                        : 'text-gray-600 border-gray-300 hover:bg-gray-50'
+                    }`}
                     disabled={isSubmitting}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                    className={`px-4 py-2 rounded transition-colors ${
+                      isDarkMode 
+                        ? 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+                    }`}
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? 'Updating...' : 'Update'}
@@ -436,6 +487,10 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables =
                 </div>
               </form>
             </>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400">No reservation data available</p>
+            </div>
           )}
         </div>
       </div>
