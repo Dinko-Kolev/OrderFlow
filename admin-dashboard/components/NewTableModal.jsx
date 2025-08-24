@@ -17,11 +17,17 @@ export default function NewTableModal({ isOpen, onClose, onSubmit }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    console.log('🔍 NewTableModal submitting form data:', formData);
     onSubmit(formData);
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    console.log('🔍 NewTableModal handleChange:', field, value, 'Previous state:', formData);
+    setFormData(prev => {
+      const newState = { ...prev, [field]: value };
+      console.log('🔍 NewTableModal new state:', newState);
+      return newState;
+    });
   };
 
   if (!isOpen) return null;
@@ -102,8 +108,13 @@ export default function NewTableModal({ isOpen, onClose, onSubmit }) {
             <div>
               <Label htmlFor="is_active">Table Status</Label>
               <Select
-                value={formData.is_active.toString()}
-                onValueChange={(value) => handleChange('is_active', value === 'true')}
+                key={`status-${formData.is_active}`}
+                value={formData.is_active ? "true" : "false"}
+                defaultValue={formData.is_active ? "true" : "false"}
+                onValueChange={(value) => {
+                  console.log('🔍 Select onValueChange:', value, typeof value);
+                  handleChange('is_active', value === 'true');
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select status" />
@@ -115,6 +126,9 @@ export default function NewTableModal({ isOpen, onClose, onSubmit }) {
               </Select>
               <p className="text-sm text-gray-500 mt-1">
                 Active tables can receive reservations. Inactive tables are temporarily removed from the reservation system.
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Current value: {formData.is_active ? "Active" : "Inactive"} (Debug: {formData.is_active.toString()})
               </p>
             </div>
 

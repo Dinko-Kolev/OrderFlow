@@ -724,13 +724,17 @@ app.post('/api/reservations', async (req, res) => {
       })
     }
 
-    // Insert reservation with table assignment
+    // Calculate reservation end time (default duration is 105 minutes)
+    const endDateTime = new Date(reservationDateTime.getTime() + (105 * 60 * 1000)); // 105 minutes
+    const reservationEndTime = endDateTime.toTimeString().substring(0, 8); // HH:MM:SS format
+    
+    // Insert reservation with table assignment and end time
     const result = await pool.query(
       `INSERT INTO table_reservations 
-       (user_id, customer_name, customer_email, customer_phone, reservation_date, reservation_time, number_of_guests, special_requests, table_id) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+       (user_id, customer_name, customer_email, customer_phone, reservation_date, reservation_time, reservation_end_time, number_of_guests, special_requests, table_id) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
        RETURNING *`,
-      [userId, customerName, customerEmail, customerPhone, reservationDate, reservationTime, numberOfGuests, specialRequests || null, bestTable.id]
+      [userId, customerName, customerEmail, customerPhone, reservationDate, reservationTime, reservationEndTime, numberOfGuests, specialRequests || null, bestTable.id]
     )
 
     const reservation = result.rows[0]
@@ -893,14 +897,15 @@ app.delete('/api/users/:userId/addresses/:addressId', authenticateToken, async (
 app.get('/api/reservations/availability/:date', async (req, res) => {
   try {
     const { date } = req.params
+    const { guests } = req.query // Get guest count from query parameters
     
     // Validate date format
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ error: 'Formato de fecha inválido. Use YYYY-MM-DD' })
     }
 
-    // Use the new table service to get real availability
-    const availability = await tableService.getTimeSlotAvailability(date)
+    // Use the new table service to get real availability for the specific party size
+    const availability = await tableService.getTimeSlotAvailability(date, parseInt(guests) || 2)
     
     res.json(availability)
 

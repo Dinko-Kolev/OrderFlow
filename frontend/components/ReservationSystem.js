@@ -46,14 +46,20 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
   useEffect(() => {
     if (formData.date) {
       setLoading(true)
-      api.reservations.getAvailability(formData.date)
+      console.log(`🔍 Frontend: Fetching availability for ${formData.date} with ${formData.guests} guests`)
+      
+      api.reservations.getAvailability(formData.date, formData.guests)
         .then(result => {
+          console.log(`🔍 Frontend: Availability response:`, result)
+          
           if (result.success) {
             // Store full availability data for better UX
             setAvailableSlots(result.data)
+            console.log(`🔍 Frontend: Set available slots:`, result.data)
             
             // If previously selected time is no longer available, reset it
             if (formData.time && !result.data.find(slot => slot.time === formData.time)?.available) {
+              console.log(`🔍 Frontend: Resetting time selection because ${formData.time} is no longer available`)
               setFormData(prev => ({ ...prev, time: '' }))
             }
           } else {
@@ -71,7 +77,7 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
         })
         .finally(() => setLoading(false))
     }
-  }, [formData.date])
+  }, [formData.date, formData.guests])
 
   // Prefill contact data from authenticated user when available, without overriding user edits
   useEffect(() => {
@@ -99,10 +105,18 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
   }
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
+    const { name, value } = e.target
+    
+    // If guest count changes, clear availability cache and reset time selection
+    if (name === 'guests') {
+      api.clearCache() // Clear API cache to get fresh availability data
+      setFormData(prev => ({ ...prev, [name]: parseInt(value), time: '' }))
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      })
+    }
   }
 
   const handleSubmit = async (e) => {

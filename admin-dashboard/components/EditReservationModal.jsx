@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 
-const EditReservationModal = ({ isOpen, onClose, onSubmit, reservationId, tables = [] }) => {
+const EditReservationModal = ({ isOpen, onClose, onSubmit, reservation, tables = [] }) => {
   const { isDarkMode } = useTheme();
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -15,8 +15,8 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservationId, tables
     special_requests: '',
     status: 'confirmed',
   })
-  const [reservation, setReservation] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [currentReservation, setCurrentReservation] = useState(null)
+
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -41,12 +41,27 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservationId, tables
     { value: '22:00:00', label: '10:00 PM' },
   ]
 
-  // Fetch reservation data when modal opens
+  // Set reservation data when modal opens
   useEffect(() => {
-    if (isOpen && reservationId) {
-      fetchReservationData()
+    if (isOpen && reservation) {
+      setCurrentReservation(reservation)
+      
+      // Set form data from the reservation object
+      const newFormData = {
+        customer_name: reservation.customer_name || '',
+        customer_email: reservation.customer_email || '',
+        customer_phone: reservation.customer_phone || '',
+        reservation_date: reservation.reservation_date || '',
+        reservation_time: reservation.reservation_time || '',
+        number_of_guests: reservation.number_of_guests || 1,
+        table_id: reservation.table_id ? String(reservation.table_id) : '',
+        special_requests: reservation.special_requests || '',
+        status: reservation.status || 'confirmed',
+      }
+      
+      setFormData(newFormData)
     }
-  }, [isOpen, reservationId])
+  }, [isOpen, reservation])
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -55,41 +70,7 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservationId, tables
     }
   }, [isOpen])
 
-  const fetchReservationData = async () => {
-    setLoading(true)
-    setErrors({})
-    
-    try {
-      // Import the API module dynamically to match test expectations
-      const { reservations } = require('../lib/api')
-      const response = await reservations.getById(reservationId)
-      
-      if (response.success && response.data) {
-        const reservationData = response.data
-        setReservation(reservationData)
-        
-        // Ensure all form fields are properly set with fallback values
-        const newFormData = {
-          customer_name: reservationData.customer_name || '',
-          customer_email: reservationData.customer_email || '',
-          customer_phone: reservationData.customer_phone || '',
-          reservation_date: reservationData.reservation_date || '',
-          reservation_time: reservationData.reservation_time || '',
-          number_of_guests: reservationData.number_of_guests || 1,
-          table_id: reservationData.table_id ? String(reservationData.table_id) : '',
-          special_requests: reservationData.special_requests || '',
-          status: reservationData.status || 'confirmed',
-        }
-        
-        setFormData(newFormData)
-      }
-    } catch (error) {
-      setErrors({ loading: 'Error loading reservation data. Please try again.' })
-      console.error('Error fetching reservation:', error)
-    }
-    
-    setLoading(false)
-  }
+
 
   // Filter tables based on guest count (only show filtering hint, don't actually filter for now)
   const getAvailableTables = () => {
@@ -223,19 +204,7 @@ const EditReservationModal = ({ isOpen, onClose, onSubmit, reservationId, tables
         </div>
         
         <div role="dialog" aria-labelledby="modal-title">
-          {loading && (
-            <div className={`text-center py-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-              <div>Loading reservation data...</div>
-            </div>
-          )}
-          
-          {errors.loading && (
-            <div className="text-red-500 dark:text-red-400 text-center py-4">
-              {errors.loading}
-            </div>
-          )}
-          
-          {!loading && !errors.loading && reservation && (
+          {reservation && (
             <>
               {/* Status and Duration Information */}
               <div className={`mb-6 p-4 rounded ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
