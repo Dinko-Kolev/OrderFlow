@@ -5,11 +5,15 @@ A comprehensive full-stack restaurant management system built with Next.js front
 ## 🏗️ Architecture
 
 ```
-project-root/
-├── frontend/          # Next.js React application
-├── backend/           # Express.js API server with modular services
-├── database/          # PostgreSQL database with schema and functions
-└── docker-compose.yml # Multi-container orchestration
+OrderFlow/
+├── frontend/           # Customer-facing Next.js React application
+├── backend/            # Main Express.js API server with modular services
+├── admin-dashboard/    # Admin interface Next.js application
+├── admin-backend/      # Admin-specific Express.js API server
+├── database/           # PostgreSQL database with schema and functions
+├── docker-compose.yml  # Multi-container orchestration
+├── setup.sh           # Automated setup script
+└── .env               # Environment variables for Docker Compose
 ```
 
 ### Tech Stack
@@ -31,49 +35,59 @@ project-root/
 
 ### Running with Docker (Recommended)
 
-1. **Navigate to project:**
-   ```bash
-   cd project-root
-   ```
+#### **🚀 One-Command Setup**
+```bash
+# Automated setup script handles everything
+./setup.sh
+```
 
-2. **Configure environment variables:**
-   ```bash
-   # Copy backend environment template
-   cp backend/env.example backend/.env
-   
-   # Edit backend/.env with your Stripe and email settings
-   # See STRIPE_SETUP.md for detailed configuration
-   ```
+This will:
+- ✅ Check Docker requirements
+- ✅ Build optimized Docker images
+- ✅ Start all services with health checks
+- ✅ Apply database migrations automatically
+- ✅ Seed sample data (68+ orders)
+- ✅ Verify system is ready
 
-3. **Start all services:**
-   ```bash
-   docker-compose up --build
-   ```
+#### **🔧 Manual Setup (Alternative)**
+```bash
+# 1. Copy environment templates
+cp .env.example .env
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
 
-4. **Access the application:**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:3001
-   - Database: localhost:5432
+# 2. Edit .env files with your settings
+# 3. Start all services
+docker-compose up --build -d
+```
 
-### 🆕 **Latest Features Quick Start**
+#### **🌐 Access Points:**
+- **Customer Frontend**: http://localhost:3000
+- **Admin Dashboard**: http://localhost:3002  
+- **Backend API**: http://localhost:3001
+- **Admin API**: http://localhost:3003
+- **pgAdmin**: http://localhost:8081
 
-#### **Stripe Payment Integration**
-1. **Configure Stripe Keys** in `backend/.env`
-2. **Set up Webhooks** using Stripe CLI for local testing
-3. **Test Payments** with Stripe test card numbers
-4. **Production Ready** - switch to live keys when deploying
+### 🆕 **Latest Features & Improvements**
 
-#### **Enhanced Security System**
-1. **CAPTCHA Protection** - Google reCAPTCHA v3 integration
-2. **Rate Limiting** - IP and user-based abuse prevention
-3. **Input Validation** - Comprehensive data sanitization
-4. **Bot Detection** - Advanced threat detection algorithms
+#### **Docker Infrastructure Improvements**
+1. **Multi-stage Dockerfiles** - Optimized builds for development and production
+2. **Health Checks** - All services monitored with automatic health verification
+3. **Environment Security** - Proper .env file management and .gitignore protection
+4. **Automated Setup** - Complete system deployment with single command
+5. **Service Dependencies** - Services start in correct order with proper waiting
 
-#### **Advanced Checkout System**
-1. **Address Management** - Save, edit, and manage delivery addresses
-2. **Payment Processing** - Secure Stripe integration
-3. **Order Confirmation** - Automated email confirmations
-4. **Guest Orders** - Complete orders without registration
+#### **Environment & Security**
+1. **Secure Environment Management** - All sensitive data protected from version control
+2. **Comprehensive .env Structure** - Service-specific environment files
+3. **Template System** - .env.example files for easy team setup
+4. **Docker Optimization** - .dockerignore files for faster builds
+
+#### **Database & Data Management**
+1. **Automatic Migrations** - Database schema applied on startup
+2. **Sample Data Seeding** - 68+ historical orders for testing
+3. **Health Monitoring** - Database connection verification
+4. **Backup Protection** - Database files excluded from version control
 
 ### Local Development
 
@@ -221,10 +235,13 @@ The email service supports multiple SMTP providers:
 
 See `backend/EMAIL_SETUP.md` for detailed configuration instructions.
 
-### Ports
-- **3000**: Frontend (Next.js)
-- **3001**: Backend (Express.js)
+### Ports & Services
+- **3000**: Customer Frontend (Next.js)
+- **3001**: Main Backend API (Express.js)
+- **3002**: Admin Dashboard (Next.js)
+- **3003**: Admin Backend API (Express.js)
 - **5432**: Database (PostgreSQL)
+- **8081**: pgAdmin (Database Management)
 
 ## 🌟 Features
 
@@ -315,6 +332,11 @@ npm start
 
 ### Docker Production
 ```bash
+# Use production environment
+export NODE_ENV=production
+docker-compose up -d
+
+# Or with production-specific compose file
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
@@ -425,11 +447,12 @@ Modern interface with:
 5. **CAPTCHA errors**: Check reCAPTCHA site and secret keys
 
 ### Development Tips
-- Use `docker-compose logs -f` to watch real-time logs
-- Frontend auto-reloads on file changes
-- Backend restarts automatically with nodemon
-- Test Stripe integration with Stripe CLI webhook forwarding
-- Use test card numbers for payment testing
+- **Use automated setup**: `./setup.sh` for complete environment setup
+- **Monitor services**: `docker-compose ps` to check service health
+- **View logs**: `docker-compose logs -f [service]` for real-time debugging
+- **Hot reload enabled**: Frontend and backend auto-restart on changes
+- **Health checks**: All services include automatic health monitoring
+- **Environment templates**: Use .env.example files for team setup
 
 ### Stripe Testing
 ```bash
@@ -468,6 +491,9 @@ This project is licensed under the MIT License.
 - **Comprehensive Security** - CAPTCHA, rate limiting, and bot detection
 - **Guest User Support** - Complete functionality without registration
 - **Advanced Checkout** - Professional address management and payment flow
+- **Docker Infrastructure** - Complete containerization with health checks
+- **Environment Security** - Secure .env management and automated setup
+- **Data Seeding** - Comprehensive sample data for testing
 
 ### 🚧 **In Development**
 - **Order Tracking** - Real-time order status updates
@@ -485,16 +511,19 @@ This project is licensed under the MIT License.
 
 ## 📚 **Additional Documentation**
 
+- **`DOCKER_SETUP.md`** - Complete Docker setup and troubleshooting guide
+- **`ENVIRONMENT_SETUP.md`** - Environment variables configuration guide
 - **`backend/EMAIL_SETUP.md`** - Complete email service configuration guide
 - **`backend/STRIPE_SETUP.md`** - Stripe payment setup and configuration
-- **`backend/env.example`** - Environment variables template
+- **`.env.example`** - Environment variables template
 - **`database/init.sql`** - Database schema and sample data
 - **`PROJECT_ROADMAP.md`** - Comprehensive project roadmap and security features
 - **`SECURITY.md`** - Security implementation details
-- **`LARAVEL_ADMIN_REQUIREMENTS.md`** - Admin dashboard requirements
+- **`RESERVATION_SYSTEM_DOCUMENTATION.md`** - Complete reservation system guide
+- **`RESTAURANT_CONFIGURATION_GUIDE.md`** - Restaurant settings configuration
 
 ---
 
 **Note**: This is a development setup. For production deployment, additional security measures and environment-specific configurations are required.
 
-**Current Version**: 3.0.0 - Enhanced with Stripe payments, comprehensive security, and advanced features 
+**Current Version**: 3.1.0 - Enhanced with Docker optimization, environment security, and automated setup 

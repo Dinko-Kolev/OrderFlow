@@ -949,5 +949,5 @@ The system is designed to be extensible:
 
 *This documentation covers the complete OrderFlow Reservation System with duration management. For technical support, contact the development team.*
 
-**Last Updated**: December 2024  
-**Version**: 2.0 (Duration-Aware)
+**Last Updated**: August 2025  
+**Version**: 2.1 (Duration-Aware with Docker Integration)

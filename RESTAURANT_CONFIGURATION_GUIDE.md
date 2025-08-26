@@ -257,6 +257,9 @@ SELECT find_next_available_slot(1, CURRENT_DATE, '14:00:00', 'dinner');
 
 ### **API Testing**
 ```bash
+# Start the system first
+./setup.sh
+
 # Test configuration endpoint
 curl http://localhost:3003/api/admin/restaurant/config
 
@@ -268,6 +271,9 @@ curl http://localhost:3003/api/admin/restaurant/time-slots/2025-08-22?service_ty
 
 # Test policies
 curl http://localhost:3003/api/admin/restaurant/policies
+
+# Check service health
+docker-compose ps
 ```
 
 ---
@@ -331,9 +337,12 @@ SELECT get_reservation_duration('lunch'), get_reservation_duration('dinner');
 ```
 
 #### **API Endpoints Not Working**
-1. Ensure admin-backend service is running
-2. Check restaurant routes are properly registered
-3. Verify database migration completed successfully
+1. **Check all services are running**: `docker-compose ps`
+2. **Ensure admin-backend service is healthy**: Look for "healthy" status
+3. **Check restaurant routes are properly registered**
+4. **Verify database migration completed successfully**
+5. **Restart services if needed**: `docker-compose restart admin-backend`
+6. **Try the automated setup**: `./setup.sh` to reset everything
 
 ### **Reset to Defaults**
 ```sql

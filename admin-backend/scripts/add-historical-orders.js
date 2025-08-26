@@ -13,61 +13,150 @@ async function addHistoricalOrders() {
   const client = await pool.connect();
   
   try {
-    console.log('🌱 Adding historical orders for Revenue Trend testing...');
+    console.log('🌱 Adding comprehensive historical orders (6 months)...');
     
     // Start transaction
     await client.query('BEGIN');
     
-    // Fetch existing customers and products
-    const customersResult = await client.query('SELECT id FROM users LIMIT 3');
-    const productsResult = await client.query('SELECT id, base_price FROM products WHERE is_available = true LIMIT 5');
+    // First, create default customers if none exist
+    let customers = [];
+    const existingCustomers = await client.query('SELECT id, first_name, last_name, email FROM users LIMIT 10');
     
-    if (customersResult.rows.length === 0 || productsResult.rows.length === 0) {
-      throw new Error('No customers or products found in database');
+    if (existingCustomers.rows.length === 0) {
+      console.log('📝 Creating default customers...');
+      const defaultCustomers = [
+        { firstName: 'Marco', lastName: 'Rossi', email: 'marco.rossi@email.com', phone: '+39 123 456 7890' },
+        { firstName: 'Giulia', lastName: 'Bianchi', email: 'giulia.bianchi@email.com', phone: '+39 234 567 8901' },
+        { firstName: 'Alessandro', lastName: 'Verdi', email: 'alessandro.verdi@email.com', phone: '+39 345 678 9012' },
+        { firstName: 'Francesca', lastName: 'Neri', email: 'francesca.neri@email.com', phone: '+39 456 789 0123' },
+        { firstName: 'Lorenzo', lastName: 'Ferrari', email: 'lorenzo.ferrari@email.com', phone: '+39 567 890 1234' }
+      ];
+      
+      for (const customer of defaultCustomers) {
+        const result = await client.query(
+          'INSERT INTO users (first_name, last_name, email, phone, is_verified, created_at) VALUES ($1, $2, $3, $4, true, NOW()) RETURNING id',
+          [customer.firstName, customer.lastName, customer.email, customer.phone]
+        );
+        customers.push({ id: result.rows[0].id, name: `${customer.firstName} ${customer.lastName}`, email: customer.email });
+      }
+      console.log(`✅ Created ${customers.length} default customers`);
+    } else {
+      customers = existingCustomers.rows.map(c => ({ 
+        id: c.id, 
+        name: `${c.first_name || 'Customer'} ${c.last_name || c.id}`,
+        email: c.email 
+      }));
+      console.log(`✅ Using ${customers.length} existing customers`);
     }
     
-    const customers = customersResult.rows;
-    const products = productsResult.rows;
+    // Check for products, create defaults if none exist
+    let products = [];
+    const existingProducts = await client.query('SELECT id, name, base_price FROM products WHERE is_available = true LIMIT 20');
     
-    console.log(`✅ Using ${customers.length} customers and ${products.length} products`);
+    if (existingProducts.rows.length === 0) {
+      console.log('📝 Creating default products...');
+      const defaultProducts = [
+        { name: 'Margherita Pizza', price: 12.50 },
+        { name: 'Pepperoni Pizza', price: 14.75 },
+        { name: 'Quattro Stagioni', price: 16.90 },
+        { name: 'Capricciosa', price: 15.60 },
+        { name: 'Diavola', price: 14.20 },
+        { name: 'Marinara', price: 10.80 },
+        { name: 'Prosciutto e Funghi', price: 16.40 },
+        { name: 'Vegetariana', price: 13.90 },
+        { name: 'Calzone', price: 12.30 },
+        { name: 'Coca Cola', price: 3.50 }
+      ];
+      
+      for (const product of defaultProducts) {
+        const result = await client.query(
+          'INSERT INTO products (name, description, base_price, category_id, is_available, created_at) VALUES ($1, $2, $3, 1, true, NOW()) RETURNING id',
+          [product.name, `Delicious ${product.name}`, product.price]
+        );
+        products.push({ id: result.rows[0].id, name: product.name, base_price: product.price });
+      }
+      console.log(`✅ Created ${products.length} default products`);
+    } else {
+      products = existingProducts.rows;
+      console.log(`✅ Using ${products.length} existing products`);
+    }
     
-    // Generate historical orders across 6 months
-    const historicalOrders = [
-      // March 2025
-      { date: '2025-03-15T12:00:00Z', amount: 45.50, customer: 0, products: [0, 1] },
-      { date: '2025-03-22T18:30:00Z', amount: 32.75, customer: 1, products: [2] },
-      { date: '2025-03-28T14:15:00Z', amount: 67.25, customer: 2, products: [0, 3, 4] },
+    // Generate many more historical orders dynamically
+    console.log('🔄 Generating comprehensive 6-month order history...');
+    
+    const historicalOrders = [];
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+    
+    // Generate 8-15 orders per month for 6 months (48-90 total orders)
+    for (let month = 0; month < 6; month++) {
+      const currentMonth = new Date(sixMonthsAgo.getFullYear(), sixMonthsAgo.getMonth() + month, 1);
+      const nextMonth = new Date(sixMonthsAgo.getFullYear(), sixMonthsAgo.getMonth() + month + 1, 1);
+      const daysInMonth = Math.floor((nextMonth - currentMonth) / (1000 * 60 * 60 * 24));
       
-      // April 2025
-      { date: '2025-04-05T19:45:00Z', amount: 28.90, customer: 0, products: [1, 2] },
-      { date: '2025-04-12T13:20:00Z', amount: 55.60, customer: 1, products: [0, 4] },
-      { date: '2025-04-18T20:10:00Z', amount: 41.30, customer: 2, products: [3] },
-      { date: '2025-04-25T16:30:00Z', amount: 38.75, customer: 0, products: [2, 4] },
+      // Generate 8-15 orders per month (more realistic volume)
+      const ordersThisMonth = Math.floor(Math.random() * 8) + 8; // 8-15 orders
       
-      // May 2025
-      { date: '2025-05-03T11:15:00Z', amount: 52.40, customer: 1, products: [0, 1, 3] },
-      { date: '2025-05-10T17:45:00Z', amount: 29.85, customer: 2, products: [2] },
-      { date: '2025-05-17T14:30:00Z', amount: 63.20, customer: 0, products: [0, 4] },
-      { date: '2025-05-24T19:20:00Z', amount: 47.90, customer: 1, products: [1, 2, 3] },
-      
-      // June 2025
-      { date: '2025-06-01T12:45:00Z', amount: 35.60, customer: 2, products: [2, 4] },
-      { date: '2025-06-08T18:15:00Z', amount: 58.75, customer: 0, products: [0, 1, 3] },
-      { date: '2025-06-15T15:30:00Z', amount: 42.10, customer: 1, products: [2] },
-      { date: '2025-06-22T20:45:00Z', amount: 71.30, customer: 2, products: [0, 1, 4] },
-      { date: '2025-06-29T13:10:00Z', amount: 33.45, customer: 0, products: [3] },
-      
-      // July 2025
-      { date: '2025-07-06T16:20:00Z', amount: 49.80, customer: 1, products: [0, 2] },
-      { date: '2025-07-13T11:35:00Z', amount: 66.90, customer: 2, products: [1, 3, 4] },
-      { date: '2025-07-20T19:50:00Z', amount: 37.25, customer: 0, products: [2, 4] },
-      { date: '2025-07-27T14:05:00Z', amount: 54.60, customer: 1, products: [0, 1, 3] },
-      
-      // August 2025 (keep existing data, just add a few more)
-      { date: '2025-08-01T12:30:00Z', amount: 43.20, customer: 2, products: [2, 3] },
-      { date: '2025-08-08T17:55:00Z', amount: 59.75, customer: 0, products: [0, 4] },
-      { date: '2025-08-15T20:15:00Z', amount: 31.40, customer: 1, products: [1, 2] }
-    ];
+      for (let i = 0; i < ordersThisMonth; i++) {
+        // Random day in month
+        const day = Math.floor(Math.random() * daysInMonth) + 1;
+        // Random hour between 11:00 and 22:00 (restaurant hours)
+        const hour = Math.floor(Math.random() * 11) + 11;
+        const minute = Math.floor(Math.random() * 60);
+        
+        const orderDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, hour, minute);
+        
+        // Random customer
+        const customerIndex = Math.floor(Math.random() * customers.length);
+        
+        // Random number of products (1-4 items per order)
+        const numProducts = Math.floor(Math.random() * 4) + 1;
+        const selectedProducts = [];
+        const usedProducts = new Set();
+        
+        for (let j = 0; j < numProducts; j++) {
+          let productIndex;
+          do {
+            productIndex = Math.floor(Math.random() * products.length);
+          } while (usedProducts.has(productIndex));
+          
+          usedProducts.add(productIndex);
+          selectedProducts.push({
+            index: productIndex,
+            quantity: Math.floor(Math.random() * 3) + 1 // 1-3 quantity
+          });
+        }
+        
+        // Calculate total amount based on selected products
+        let totalAmount = 0;
+        selectedProducts.forEach(item => {
+          totalAmount += products[item.index].base_price * item.quantity;
+        });
+        
+        // Add random delivery fee for delivery orders (20-30% chance)
+        const isDelivery = Math.random() > 0.7;
+        if (isDelivery) {
+          totalAmount += Math.floor(Math.random() * 3) + 3; // 3-5 euro delivery fee
+        }
+        
+        // Add some randomness to final amount (±10%)
+        totalAmount = totalAmount * (0.9 + Math.random() * 0.2);
+        totalAmount = Math.round(totalAmount * 100) / 100; // Round to 2 decimals
+        
+        historicalOrders.push({
+          date: orderDate.toISOString(),
+          amount: totalAmount,
+          customer: customerIndex,
+          products: selectedProducts,
+          isDelivery
+        });
+      }
+    }
+    
+    // Sort orders by date
+    historicalOrders.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    console.log(`📊 Generated ${historicalOrders.length} orders spanning ${sixMonthsAgo.toLocaleDateString()} to ${now.toLocaleDateString()}`);
     
     let successCount = 0;
     let orderCounter = 1;
@@ -79,19 +168,37 @@ async function addHistoricalOrders() {
         
         console.log(`📝 Creating order ${orderNumber} for ${order.date} with amount $${order.amount}...`);
         
-        // Create order with order_number
+        // Create order with required fields
+        const orderType = order.isDelivery ? 'delivery' : 'pickup';
+        const deliveryFee = orderType === 'delivery' ? Math.floor(Math.random() * 3) + 3 : 0;
+        const subtotal = order.amount - deliveryFee;
+        const customer = customers[order.customer];
+        
         const orderResult = await client.query(
-          'INSERT INTO orders (order_number, user_id, total_amount, status, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-          [orderNumber, customers[order.customer].id, order.amount, 'completed', order.date]
+          'INSERT INTO orders (order_number, user_id, total_amount, subtotal, delivery_fee, order_type, status, created_at, order_date, customer_name, customer_email, customer_phone) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id',
+          [
+            orderNumber, 
+            customer.id, 
+            order.amount, 
+            subtotal,
+            deliveryFee,
+            orderType,
+            'completed', 
+            order.date,
+            order.date,
+            customer.name,
+            customer.email,
+            `+39 ${Math.floor(Math.random() * 900 + 100)} ${Math.floor(Math.random() * 9000 + 1000)}`
+          ]
         );
         
         const orderId = orderResult.rows[0].id;
-        console.log(`   ✅ Order created with ID: ${orderId}`);
+        console.log(`   ✅ Order ${orderNumber} created (${orderType}) - €${order.amount}`);
         
-        // Create order items
-        for (const productIndex of order.products) {
-          const product = products[productIndex];
-          const quantity = Math.floor(Math.random() * 2) + 1; // 1-2 quantity
+        // Create order items with realistic quantities
+        for (const productItem of order.products) {
+          const product = products[productItem.index];
+          const quantity = productItem.quantity;
           const itemTotal = (product.base_price * quantity);
           
           await client.query(
@@ -113,9 +220,12 @@ async function addHistoricalOrders() {
     // Commit transaction
     await client.query('COMMIT');
     
-    console.log('\n🎉 Historical orders added successfully!');
-    console.log(`📊 Created ${successCount} historical orders across 6 months`);
-    console.log(`📅 Data now spans: March 2025 - August 2025`);
+    console.log('\n🎉 Historical orders generation completed!');
+    console.log(`📊 Created ${successCount} orders out of ${historicalOrders.length} attempted`);
+    console.log(`📅 Data spans: ${sixMonthsAgo.toLocaleDateString()} to ${now.toLocaleDateString()}`);
+    console.log(`💰 Order types: ~70% pickup, ~30% delivery`);
+    console.log(`🍕 Products: ${products.length} different items available`);
+    console.log(`👥 Customers: ${customers.length} different customers`);
     
   } catch (error) {
     await client.query('ROLLBACK');

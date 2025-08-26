@@ -1,5 +1,5 @@
 // Admin Dashboard API Client
-const API_BASE_URL = process.env.NEXT_PUBLIC_ADMIN_API_URL || 'http://localhost:3001/api/admin'
+const API_BASE_URL = process.env.NEXT_PUBLIC_ADMIN_API_URL || 'http://localhost:3003/api/admin'
 
 // Helper function to handle API requests
 const apiRequest = async (endpoint, options = {}) => {

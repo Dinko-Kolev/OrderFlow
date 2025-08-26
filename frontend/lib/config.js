@@ -2,6 +2,7 @@
 const config = {
   // API Configuration
   API_BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+  ADMIN_API_BASE_URL: process.env.NEXT_PUBLIC_ADMIN_API_URL || 'http://localhost:3003/api/admin',
   
   // App Configuration
   APP_NAME: 'Bella Vista Restaurant',
@@ -70,4 +71,9 @@ export const API_ENDPOINTS = {
 // Build full API URL
 export const buildApiUrl = (endpoint) => {
   return `${config.API_BASE_URL}${endpoint}`
+}
+
+// Build admin API URL
+export const buildAdminApiUrl = (endpoint) => {
+  return `${config.ADMIN_API_BASE_URL}${endpoint}`
 } 

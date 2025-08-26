@@ -1,4 +1,4 @@
-# 🧪 OrderFlow Reservation System - Testing Implementation Summary
+ c# 🧪 OrderFlow Reservation System - Testing Implementation Summary
 
 ## 🎯 What Has Been Implemented
 
@@ -37,13 +37,19 @@ This document summarizes the comprehensive testing implementation for the OrderF
 
 ## 🚀 Quick Start Guide
 
-### 1. Install Dependencies
+### 1. Setup Environment
+```bash
+# Ensure Docker environment is ready
+./setup.sh
+```
+
+### 2. Install Dependencies
 ```bash
 # Install all dependencies across all components
 ./run-reservation-tests.sh --install
 ```
 
-### 2. Run All Tests
+### 3. Run All Tests
 ```bash
 # Run comprehensive test suite
 ./run-reservation-tests.sh
@@ -331,8 +337,10 @@ open coverage/lcov-report/index.html
 ## 🚨 Support and Troubleshooting
 
 ### Common Issues
+- **Environment Setup**: Use `./setup.sh` to ensure Docker environment is ready
 - **Dependencies**: Use `--install` flag to install all dependencies
 - **Database**: Ensure Docker is running and database is accessible
+- **Service Health**: Check `docker-compose ps` for service status
 - **Permissions**: Make test runner script executable with `chmod +x`
 - **Node Version**: Ensure Node.js 18+ is installed
 
