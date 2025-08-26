@@ -1,4 +1,4 @@
-import config, { buildApiUrl, API_ENDPOINTS } from './config'
+import config, { buildApiUrl, buildAdminApiUrl, API_ENDPOINTS } from './config'
 
 // Professional API Client with error handling, retries, and caching
 class ApiClient {
@@ -12,7 +12,18 @@ class ApiClient {
   async request(endpoint, options = {}) {
     const url = buildApiUrl(endpoint)
     console.log('API Request:', { endpoint, url, options })
+    return this._makeRequest(url, options)
+  }
 
+  // Admin request method
+  async adminRequest(endpoint, options = {}) {
+    const url = buildAdminApiUrl(endpoint)
+    console.log('Admin API Request:', { endpoint, url, options })
+    return this._makeRequest(url, options)
+  }
+
+  // Internal method for making actual requests
+  async _makeRequest(url, options = {}) {
     // Strip/normalize non-fetch options
     const { cache: internalCacheFlag, ...restOptions } = options || {}
     const fetchOptions = { ...restOptions }
@@ -109,6 +120,29 @@ class ApiClient {
     }
     
     return result
+  }
+
+  // Admin GET request
+  async adminGet(endpoint, options = {}) {
+    return this.adminRequest(endpoint, { method: 'GET', ...options })
+  }
+
+  // Admin POST request  
+  async adminPost(endpoint, data, options = {}) {
+    return this.adminRequest(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      ...options
+    })
+  }
+
+  // Admin PUT request
+  async adminPut(endpoint, data, options = {}) {
+    return this.adminRequest(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      ...options
+    })
   }
 
   // POST request
@@ -211,19 +245,19 @@ export const api = {
 
   // Reservations endpoints  
   reservations: {
-    create: (reservationData) => apiClient.post('/api/reservations', reservationData),
+    create: (reservationData) => apiClient.adminPost('/reservations', reservationData),
     getAvailability: (date, guests) => {
       const params = new URLSearchParams()
       if (guests) params.append('guests', guests)
-      return apiClient.get(`/api/reservations/availability/${date}?${params.toString()}`, {
+      return apiClient.adminGet(`/reservations/availability/${date}?${params.toString()}`, {
         cache: false // Disable cache for real-time availability
       })
     },
-    getTableOverview: (date) => apiClient.get(`/api/reservations/tables/${date}`),
-    getUserReservations: () => apiClient.get('/api/reservations/user', {
+    getTableOverview: (date) => apiClient.adminGet(`/tables`),
+    getUserReservations: () => apiClient.adminGet('/reservations', {
       headers: apiClient.getAuthHeaders()
     }),
-    cancel: (reservationId) => apiClient.put(`/api/reservations/${reservationId}/cancel`, {}, {
+    cancel: (reservationId) => apiClient.adminPut(`/reservations/${reservationId}`, { status: 'cancelled' }, {
       headers: apiClient.getAuthHeaders()
     })
   },

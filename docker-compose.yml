@@ -3,54 +3,66 @@ services:
     image: postgres:15
     restart: always
     environment:
-      POSTGRES_USER: pizza_user
-      POSTGRES_PASSWORD: pizza_pass
-      POSTGRES_DB: pizza_db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./database/reservation_duration_migration.sql:/docker-entrypoint-initdb.d/02-reservation_duration_migration.sql
+      - ./database/restaurant_configuration_migration.sql:/docker-entrypoint-initdb.d/03-restaurant_configuration_migration.sql
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pizza_user -d pizza_db"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   pgadmin:
     image: dpage/pgadmin4:latest
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@pizza.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: ${PGADMIN_CONFIG_SERVER_MODE}
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     ports:
-      - "8080:80"
+      - "8081:80"
     depends_on:
       - db
     networks:
       - default
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: pizza_user
-      DB_PASS: pizza_pass
-      DB_NAME: pizza_db
-      NODE_ENV: development
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+      NODE_ENV: ${NODE_ENV}
       # Email Configuration
-      SMTP_HOST: mail.kolevhosting.com
-      SMTP_PORT: 587
-      SMTP_USER: bellavistapizza@kolevhosting.com
-      SMTP_PASS: xurnam-gyqxoj-1vuznE
-      SMTP_SECURE: false
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_SECURE: ${SMTP_SECURE}
+      # Stripe Configuration
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET}
+      # reCAPTCHA Configuration
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY}
     ports:
       - "3001:3001"
     volumes:
@@ -58,18 +70,26 @@ services:
       - /app/node_modules
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
-      NODE_ENV: development
-      NEXT_TELEMETRY_DISABLED: 1
+      NODE_ENV: ${NODE_ENV}
+      NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_ADMIN_API_URL: ${NEXT_PUBLIC_ADMIN_API_URL}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY}
     ports:
       - "3000:3000"
     volumes:
@@ -77,44 +97,83 @@ services:
       - /app/node_modules
       - /app/.next
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   admin-backend:
-    build: ./admin-backend
+    build: 
+      context: ./admin-backend
+      dockerfile: Dockerfile
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: pizza_user
-      DB_PASS: pizza_pass
-      DB_NAME: pizza_db
-      NODE_ENV: development
-      ADMIN_PORT: 3003
-      ADMIN_FRONTEND_URL: http://localhost:3002
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+      NODE_ENV: ${NODE_ENV}
+      ADMIN_PORT: ${ADMIN_BACKEND_PORT}
+      ADMIN_FRONTEND_URL: ${ADMIN_FRONTEND_URL}
     ports:
-      - "3003:3003"
+      - "${ADMIN_BACKEND_PORT}:${ADMIN_BACKEND_PORT}"
     volumes:
       - ./admin-backend:/app
       - /app/node_modules
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${ADMIN_BACKEND_PORT}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
 
   admin-dashboard:
-    build: ./admin-dashboard
+    build: 
+      context: ./admin-dashboard
+      dockerfile: Dockerfile
     depends_on:
-      - admin-backend
+      admin-backend:
+        condition: service_healthy
     environment:
-      NODE_ENV: development
-      NEXT_TELEMETRY_DISABLED: 1
-      PORT: 3002
+      NODE_ENV: ${NODE_ENV}
+      NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED}
+      PORT: ${ADMIN_DASHBOARD_PORT}
+      NEXT_PUBLIC_ADMIN_API_URL: ${NEXT_PUBLIC_ADMIN_API_URL}
     ports:
-      - "3002:3002"
+      - "${ADMIN_DASHBOARD_PORT}:${ADMIN_DASHBOARD_PORT}"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${ADMIN_DASHBOARD_PORT}/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Data initialization service (runs once to seed data)
+  data-init:
+    build: 
+      context: ./admin-backend
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+      NODE_ENV: ${NODE_ENV}
+    command: ["node", "scripts/add-historical-orders.js"]
+    restart: "no"
+    profiles:
+      - seed-data
 
 volumes:
   pgdata:

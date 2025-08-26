@@ -15,13 +15,19 @@
 
 ## 🚀 **Setup Complete!**
 
-Your map is already working! No additional setup needed.
+Your map is already working! No additional setup needed with the new Docker environment.
 
 ## 🧪 **Test Your Free Map:**
 
-1. **Go to:** `http://localhost:3000/contact`
-2. **Scroll down** to "📍 Cómo Llegar"
-3. **You'll see:** A beautiful, interactive map interface!
+1. **Start the system:** `./setup.sh` (or `docker-compose up -d`)
+2. **Go to:** `http://localhost:3000/contact`
+3. **Scroll down** to "📍 Cómo Llegar"
+4. **You'll see:** A beautiful, interactive map interface!
+
+### Quick Access URLs:
+- **Customer Frontend**: http://localhost:3000
+- **Admin Dashboard**: http://localhost:3002 (for restaurant staff)
+- **Backend API**: http://localhost:3001 (for developers)
 
 ## 🎯 **Features Included:**
 
@@ -109,9 +115,11 @@ Edit `frontend/components/SimpleMap.js` to change:
 ## 🚨 **Troubleshooting:**
 
 ### **Map Not Loading:**
-- Check if frontend is running: `docker-compose ps`
-- Restart frontend: `docker-compose restart frontend`
-- Check browser console for errors
+- **Check all services are running:** `docker-compose ps`
+- **Restart frontend:** `docker-compose restart frontend`
+- **Check service health:** All services should show "healthy" status
+- **Check browser console for errors**
+- **Try the automated setup:** `./setup.sh` to reset everything
 
 ### **Buttons Not Working:**
 - Verify the component is imported correctly

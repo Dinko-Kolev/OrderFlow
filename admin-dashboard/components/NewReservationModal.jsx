@@ -56,8 +56,8 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
       // Convert time format from HH:MM:SS to HH:MM for API
       const timeForAPI = formData.reservation_time.substring(0, 5)
       
-      // Direct fetch call to backend availability endpoint
-      fetch(`http://localhost:3001/api/reservations/availability/${formData.reservation_date}?guests=${parseInt(formData.number_of_guests)}`)
+      // Direct fetch call to admin backend availability endpoint
+      fetch(`http://localhost:3003/api/admin/reservations/availability/${formData.reservation_date}?guests=${parseInt(formData.number_of_guests)}`)
         .then(response => response.json())
         .then(result => {
           if (result.success) {
@@ -82,7 +82,7 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
     }
   }, [formData.reservation_date, formData.reservation_time, formData.number_of_guests])
 
-  // Filter tables based on guest count AND availability
+  // Filter tables based on guest count AND actual availability
   const getAvailableTables = () => {
     if (!formData.number_of_guests || !formData.reservation_date || !formData.reservation_time) {
       return tables.filter(table => table.is_active)
@@ -94,14 +94,22 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
     // First filter by capacity
     const capacityFilteredTables = tables.filter(table => table.is_active && table.capacity >= guestCount)
     
-    // If we have availability data, filter by actual availability
-    if (availableSlots.length > 0) {
+    // If we have availability data for the selected time, use it to filter
+    if (availableSlots.length > 0 && formData.reservation_time) {
       const timeForAPI = formData.reservation_time.substring(0, 5)
       const currentSlot = availableSlots.find(slot => slot.time === timeForAPI)
       
       if (currentSlot && !currentSlot.available) {
         // No tables available at this time, return empty array
         return []
+      }
+      
+      // If we have specific table data from the availability API, use it
+      if (currentSlot && currentSlot.tables) {
+        // Return only tables that are actually available according to the API
+        return capacityFilteredTables.filter(table => 
+          currentSlot.tables.some(availableTable => availableTable.id === table.id)
+        )
       }
     }
     

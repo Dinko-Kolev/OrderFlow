@@ -167,7 +167,10 @@ project-root/
 ### Quick Start
 
 ```bash
-# Run all tests
+# Ensure Docker environment is running first
+./setup.sh
+
+# Run all reservation tests
 ./run-reservation-tests.sh
 
 # Install dependencies and run all tests
@@ -875,10 +878,13 @@ on:
 
 #### Test Environment Setup
 ```bash
-# Clear Jest cache
+# Use automated setup to reset everything
+./setup.sh
+
+# Clear Jest cache if needed
 npm run test -- --clearCache
 
-# Reset node_modules
+# Reset node_modules if needed
 rm -rf node_modules package-lock.json
 npm install
 
@@ -889,7 +895,7 @@ npm --version
 
 #### Database Connection Issues
 ```bash
-# Check if database is running
+# Check if all services are running and healthy
 docker-compose ps
 
 # Restart database
@@ -897,6 +903,9 @@ docker-compose restart db
 
 # Check database logs
 docker-compose logs db
+
+# Full restart if needed
+docker-compose down && ./setup.sh
 ```
 
 #### Test Failures

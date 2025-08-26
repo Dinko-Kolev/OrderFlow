@@ -41,30 +41,58 @@ This guide will help you integrate Google Maps into your Bella Vista Restaurant 
 
 ## ⚙️ **Step 2: Configure Environment Variables**
 
-### 2.1 Create Frontend Environment File
+### 2.1 Environment File Setup
+The new Docker setup automatically manages environment files:
+
 ```bash
-# In your frontend directory
-cp env.example .env.local
+# Option 1: Use automated setup (Recommended)
+./setup.sh
+
+# Option 2: Manual setup
+cp frontend/.env.example frontend/.env.local
 ```
 
 ### 2.2 Add Your API Key
 Edit `frontend/.env.local`:
 ```env
+# Google Maps API Key (Required for maps functionality)
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyB...your_actual_api_key_here
+
+# Other frontend environment variables are already configured
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_ADMIN_API_URL=http://localhost:3003/api/admin
 ```
+
+### 2.3 Security Note
+The Google Maps API key is automatically protected by the improved `.gitignore` setup - it will never be committed to version control.
 
 ## 🚀 **Step 3: Test the Integration**
 
-### 3.1 Restart Your Frontend
+### 3.1 Start/Restart Services
 ```bash
-# Stop and restart your frontend
+# Option 1: Use automated setup
+./setup.sh
+
+# Option 2: Manual restart
 docker-compose restart frontend
+
+# Option 3: Full restart
+docker-compose down && docker-compose up -d
 ```
 
 ### 3.2 Visit the Contact Page
 - Go to: `http://localhost:3000/contact`
 - Scroll down to "📍 Cómo Llegar"
 - You should see an interactive Google Map!
+
+### 3.3 Check Service Status
+```bash
+# Verify all services are healthy
+docker-compose ps
+
+# View frontend logs if issues
+docker-compose logs frontend
+```
 
 ## 🎯 **Features Included**
 
@@ -123,9 +151,12 @@ Change the restaurant address:
 ## 🚨 **Troubleshooting**
 
 ### Map Not Loading
-- Check API key in `.env.local`
-- Verify API is enabled in Google Cloud Console
-- Check browser console for errors
+- **Check API key in `.env.local`**
+- **Verify API is enabled in Google Cloud Console**
+- **Check browser console for errors**
+- **Restart frontend service:** `docker-compose restart frontend`
+- **Check service health:** `docker-compose ps`
+- **Try automated setup:** `./setup.sh` to reset everything
 
 ### "Failed to load Google Maps"
 - API key is invalid or restricted

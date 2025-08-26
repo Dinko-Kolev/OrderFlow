@@ -200,6 +200,16 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Check table capacity
+    const tableCapacity = tableCheck.rows[0].capacity;
+    if (number_of_guests > tableCapacity) {
+      client.release();
+      return res.status(400).json({
+        success: false,
+        error: `Table capacity exceeded. Table "${tableCheck.rows[0].name}" can accommodate maximum ${tableCapacity} guests, but ${number_of_guests} guests requested.`
+      });
+    }
+
     // Check business hours (12:00-15:00 for lunch, 19:00-22:30 for dinner)
     const reservationTime = new Date(`2000-01-01T${reservation_time}`);
     const hour = reservationTime.getHours();
@@ -907,6 +917,87 @@ router.get('/utilization', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch utilization data',
+      details: error.message
+    });
+  }
+});
+
+// GET /api/admin/reservations/availability/:date - Get available time slots for a date
+router.get('/availability/:date', async (req, res) => {
+  try {
+    const { date } = req.params;
+    const { guests = 2 } = req.query;
+    
+    const client = await pool.connect();
+    
+    // Validate date format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid date format. Use YYYY-MM-DD'
+      });
+    }
+
+    // Time slots available for reservations
+    const timeSlots = [
+      '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+      '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00'
+    ];
+
+    const availability = [];
+
+    for (const time of timeSlots) {
+      // Check available tables for this time slot
+      const query = `
+        SELECT 
+          rt.id,
+          rt.table_number,
+          rt.capacity,
+          rt.is_active
+        FROM restaurant_tables rt
+        WHERE rt.is_active = true 
+        AND rt.capacity >= $1
+        AND NOT EXISTS (
+          SELECT 1 FROM table_reservations tr 
+          WHERE tr.table_id = rt.id 
+          AND tr.reservation_date = $2 
+          AND tr.status IN ('confirmed', 'seated')
+          AND (
+            -- Check for overlapping reservations (105 min duration)
+            ($3::time >= tr.reservation_time AND $3::time < (tr.reservation_time + INTERVAL '105 minutes')::time)
+            OR
+            (tr.reservation_time >= $3::time AND tr.reservation_time < ($3::time + INTERVAL '105 minutes')::time)
+          )
+        )
+        ORDER BY rt.table_number
+      `;
+      
+      const result = await client.query(query, [guests, date, time]);
+      const availableTables = result.rows.length;
+      const totalCapacity = result.rows.reduce((sum, table) => sum + table.capacity, 0);
+      
+      availability.push({
+        time,
+        availableTables,
+        totalCapacity,
+        available: availableTables > 0,
+        tables: result.rows // Include the actual available tables
+      });
+    }
+
+    client.release();
+    
+    res.json({
+      success: true,
+      data: availability,
+      message: `Retrieved availability for ${date} with ${guests} guests`
+    });
+
+  } catch (error) {
+    console.error('Error checking availability:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check availability',
       details: error.message
     });
   }

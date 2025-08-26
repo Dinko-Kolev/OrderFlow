@@ -66,25 +66,69 @@ const PaymentForm = ({
     setError(null);
 
     try {
-      // 1. Create order and get payment intent from backend
-      console.log('💰 Creating order with payment intent...');
+      // Validate customerData before sending
+      const { customerName, customerEmail, customerPhone, deliveryType, items } = customerData;
       
-      const orderResponse = await fetch(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/orders', {
+      if (!customerName || !customerEmail || !deliveryType || !items || !Array.isArray(items) || items.length === 0) {
+        throw new Error('Missing required order information. Please check your cart and customer details.');
+      }
+
+      // Validate items structure
+      for (const item of items) {
+        if (!item.productId || !item.quantity || item.quantity <= 0) {
+          throw new Error(`Invalid item: ${JSON.stringify(item)}. Each item must have productId and valid quantity.`);
+        }
+      }
+
+      console.log('💰 Creating order with payment intent...', {
+        customerName,
+        customerEmail,
+        deliveryType,
+        itemCount: items.length,
+        totalAmount: amount
+      });
+      
+      const orderPayload = {
+        customerName,
+        customerEmail,
+        customerPhone,
+        deliveryType,
+        deliveryAddress: customerData.deliveryAddress,
+        specialInstructions: customerData.specialInstructions,
+        items: items,
+        totalAmount: amount,
+        paymentMethod: 'stripe'
+      };
+
+      const orderResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/orders`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
-        body: JSON.stringify({
-          ...customerData,
-          totalAmount: amount,
-          paymentMethod: 'stripe'
-        })
+        body: JSON.stringify(orderPayload)
       });
 
       if (!orderResponse.ok) {
-        const errorData = await orderResponse.json();
-        throw new Error(errorData.error || 'Failed to create order');
+        let errorMessage = 'Failed to create order';
+        try {
+          // Try to get the response as text first, then parse as JSON
+          const responseText = await orderResponse.text();
+          
+          // Try to parse as JSON
+          try {
+            const errorData = JSON.parse(responseText);
+            errorMessage = errorData.error || errorData.details || errorMessage;
+          } catch (jsonParseError) {
+            // If it's not JSON (like HTML error page), log it and provide a helpful message
+            console.error('Non-JSON error response:', responseText);
+            errorMessage = `Server error (${orderResponse.status}). Please check your order details and try again.`;
+          }
+        } catch (readError) {
+          console.error('Error reading response:', readError);
+          errorMessage = `Server error (${orderResponse.status}). Please try again.`;
+        }
+        throw new Error(errorMessage);
       }
 
       const { order, paymentIntent } = await orderResponse.json();
