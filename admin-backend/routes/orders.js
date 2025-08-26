@@ -9,21 +9,22 @@ router.get("/", async (req, res) => {
       SELECT 
         o.id, 
         o.user_id,
-        u.email as customer_email,
-        u.first_name,
-        u.last_name,
+        o.customer_name,                  
+        o.customer_email,                 
+        o.customer_phone, 
         o.total_amount, 
         o.status, 
-        o.order_date as created_at,
+        o.created_at,
         COUNT(oi.id) as item_count
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
-      GROUP BY o.id, o.user_id, u.email, u.first_name, u.last_name, o.total_amount, o.status, o.order_date
-      ORDER BY o.order_date DESC 
+      GROUP BY o.id, o.user_id, o.customer_name, o.customer_email, o.customer_phone, 
+               o.total_amount, o.status, o.created_at
+      ORDER BY o.created_at DESC 
       LIMIT 3500
     `);
-    
+
     res.json({
       success: true,
       data: rows,
@@ -47,21 +48,21 @@ router.get("/:id", async (req, res) => {
     const { rows } = await pool.query(`
       SELECT 
         o.*,
-        u.email as customer_email,
-        u.first_name,
-        u.last_name
+        COALESCE(o.customer_email, u.email) as customer_email,
+        COALESCE(o.customer_name, CONCAT(u.first_name, ' ', u.last_name)) as customer_name,
+        COALESCE(o.customer_phone, u.phone) as customer_phone
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       WHERE o.id = $1
     `, [id]);
-    
+
     if (rows.length === 0) {
       return res.status(404).json({
         success: false,
         error: "Order not found"
       });
     }
-    
+
     res.json({
       success: true,
       data: rows[0],
@@ -111,7 +112,7 @@ router.get("/:id/items", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const { user_id, total_amount, status = 'pending', items } = req.body;
-    
+
     if (!user_id || !total_amount || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         success: false,
@@ -123,30 +124,30 @@ router.post("/", async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      
+
       // Create order
       const orderResult = await client.query(`
         INSERT INTO orders (user_id, total_amount, status, created_at, updated_at)
         VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         RETURNING id
       `, [user_id, total_amount, status]);
-      
+
       const orderId = orderResult.rows[0].id;
-      
+
       // Create order items
       for (const item of items) {
         if (!item.product_id || !item.quantity || !item.price) {
           throw new Error(`Invalid item data: product_id, quantity, and price are required`);
         }
-        
+
         await client.query(`
           INSERT INTO order_items (order_id, product_id, quantity, price)
           VALUES ($1, $2, $3, $4)
         `, [orderId, item.product_id, item.quantity, item.price]);
       }
-      
+
       await client.query('COMMIT');
-      
+
       res.status(201).json({
         success: true,
         data: { id: orderId },
@@ -173,7 +174,7 @@ router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { user_id, total_amount, status, items } = req.body;
-    
+
     if (!user_id || !total_amount || !status) {
       return res.status(400).json({
         success: false,
@@ -194,7 +195,7 @@ router.put("/:id", async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      
+
       // Update order
       const orderResult = await client.query(`
         UPDATE orders 
@@ -202,27 +203,27 @@ router.put("/:id", async (req, res) => {
         WHERE id = $4
         RETURNING *
       `, [user_id, total_amount, status, id]);
-      
+
       // If items are provided, update them
       if (items && Array.isArray(items)) {
         // Delete existing items
         await client.query('DELETE FROM order_items WHERE order_id = $1', [id]);
-        
+
         // Insert new items
         for (const item of items) {
           if (!item.product_id || !item.quantity || !item.price) {
             throw new Error(`Invalid item data: product_id, quantity, and price are required`);
           }
-          
+
           await client.query(`
             INSERT INTO order_items (order_id, product_id, quantity, price)
             VALUES ($1, $2, $3, $4)
           `, [id, item.product_id, item.quantity, item.price]);
         }
       }
-      
+
       await client.query('COMMIT');
-      
+
       res.json({
         success: true,
         data: orderResult.rows[0],
@@ -249,21 +250,21 @@ router.put("/:id/status", async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    
+
     const { rows } = await pool.query(`
       UPDATE orders 
       SET status = $1, updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
       RETURNING *
     `, [status, id]);
-    
+
     if (rows.length === 0) {
       return res.status(404).json({
         success: false,
         error: "Order not found"
       });
     }
-    
+
     res.json({
       success: true,
       data: rows[0],
@@ -283,7 +284,7 @@ router.put("/:id/status", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Check if order exists
     const orderCheck = await pool.query('SELECT id FROM orders WHERE id = $1', [id]);
     if (orderCheck.rows.length === 0) {
@@ -297,15 +298,15 @@ router.delete("/:id", async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      
+
       // Delete order items first (due to foreign key constraint)
       await client.query('DELETE FROM order_items WHERE order_id = $1', [id]);
-      
+
       // Delete order
       await client.query('DELETE FROM orders WHERE id = $1', [id]);
-      
+
       await client.query('COMMIT');
-      
+
       res.json({
         success: true,
         message: "Order deleted successfully"
