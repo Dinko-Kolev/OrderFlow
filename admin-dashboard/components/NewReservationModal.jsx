@@ -63,10 +63,8 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
           if (result.success) {
             setAvailableSlots(result.data)
             
-            // If previously selected time is no longer available, reset it
-            if (formData.reservation_time && !result.data.find(slot => slot.time === timeForAPI)?.available) {
-              setFormData(prev => ({ ...prev, reservation_time: '' }))
-            }
+            // Don't reset the time selection - let user see the availability warning instead
+            // This prevents the confusing "Select time" reset behavior
           } else {
             console.error('Error fetching availability:', result.error)
             setAvailableSlots([])
@@ -82,6 +80,7 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
     }
   }, [formData.reservation_date, formData.reservation_time, formData.number_of_guests])
 
+  
   // Filter tables based on guest count AND actual availability
   const getAvailableTables = () => {
     if (!formData.number_of_guests || !formData.reservation_date || !formData.reservation_time) {
@@ -91,10 +90,7 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
     const guestCount = parseInt(formData.number_of_guests, 10)
     if (Number.isNaN(guestCount)) return tables.filter(table => table.is_active)
     
-    // First filter by capacity
-    const capacityFilteredTables = tables.filter(table => table.is_active && table.capacity >= guestCount)
-    
-    // If we have availability data for the selected time, use it to filter
+    // If we have availability data for the selected time, use it directly
     if (availableSlots.length > 0 && formData.reservation_time) {
       const timeForAPI = formData.reservation_time.substring(0, 5)
       const currentSlot = availableSlots.find(slot => slot.time === timeForAPI)
@@ -104,16 +100,21 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
         return []
       }
       
-      // If we have specific table data from the availability API, use it
-      if (currentSlot && currentSlot.tables) {
+      // If we have specific table data from the availability API, use it directly
+      if (currentSlot && currentSlot.tables && currentSlot.tables.length > 0) {
         // Return only tables that are actually available according to the API
-        return capacityFilteredTables.filter(table => 
-          currentSlot.tables.some(availableTable => availableTable.id === table.id)
-        )
+        // These tables are already filtered by capacity and availability
+        return currentSlot.tables.map(availableTable => ({
+          id: availableTable.id,
+          table_number: availableTable.table_number,
+          capacity: availableTable.capacity,
+          is_active: availableTable.is_active
+        }))
       }
     }
     
-    return capacityFilteredTables
+    // Fallback: filter by capacity only (when no availability data)
+    return tables.filter(table => table.is_active && table.capacity >= guestCount)
   }
 
   // Get availability warning for current party size and time
@@ -132,6 +133,14 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
         return {
           type: 'error',
           message: `No tables available for ${guestCount} guests at ${timeForAPI}. Please select a different time.`
+        };
+      }
+      
+      if (currentSlot && currentSlot.available) {
+        const tableInfo = currentSlot.tables.map(t => `Table ${t.table_number} (${t.capacity} seats)`).join(', ');
+        return {
+          type: 'success',
+          message: `Available tables at ${timeForAPI}: ${tableInfo}`
         };
       }
     }
@@ -156,7 +165,7 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
   // Check if form can be submitted
   const canSubmitForm = () => {
     const warning = getAvailabilityWarning();
-    const hasAvailableTables = availableTables.length > 0;
+    const hasAvailableTables = getAvailableTables().length > 0;
     return (!warning || warning.type !== 'error') && hasAvailableTables;
   };
 
@@ -331,13 +340,17 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
             <div className={`mb-4 p-3 rounded-lg border ${
               availabilityWarning.type === 'error' 
                 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200' 
-                : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-200'
+                : availabilityWarning.type === 'warning'
+                ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-200'
+                : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200'
             }`}>
               <div className="flex items-center space-x-2">
                 {availabilityWarning.type === 'error' ? (
                   <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                ) : (
+                ) : availabilityWarning.type === 'warning' ? (
                   <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                ) : (
+                  <div className="h-4 w-4 text-green-600 dark:text-green-400">✓</div>
                 )}
                 <span className="text-sm font-medium">{availabilityWarning.message}</span>
               </div>
@@ -470,6 +483,11 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
             <div className="mb-4">
               <label htmlFor="reservation_time" className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                 Time *
+                {loadingAvailability && formData.reservation_date && formData.number_of_guests && (
+                  <span className="text-xs font-normal text-blue-600 dark:text-blue-400 ml-2">
+                    (Checking availability...)
+                  </span>
+                )}
               </label>
               <select
                 id="reservation_time"
@@ -484,39 +502,86 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
                 }`}
               >
                 <option value="">Select time</option>
-                {timeSlots.map(slot => (
-                  <option
-                    key={slot.value}
-                    value={slot.value}
-                    onClick={() => setFormData(prev => ({ ...prev, reservation_time: slot.value }))}
-                  >
-                    {slot.label}
-                  </option>
-                ))}
+                {timeSlots.map(slot => {
+                  // Check if this time slot has availability data
+                  const timeForAPI = slot.value.substring(0, 5)
+                  const availability = availableSlots.find(avail => avail.time === timeForAPI)
+                  const hasAvailability = availability?.available || false
+                  const availableTables = availability?.tables?.length || 0
+                  
+                  return (
+                    <option
+                      key={slot.value}
+                      value={slot.value}
+                      onClick={() => setFormData(prev => ({ ...prev, reservation_time: slot.value }))}
+                    >
+                      {slot.label}
+                      {formData.number_of_guests && availability && (
+                        hasAvailability 
+                          ? ` - ${availableTables} table${availableTables !== 1 ? 's' : ''} available`
+                          : ' - No tables available'
+                      )}
+                    </option>
+                  )
+                })}
               </select>
               {errors.reservation_time && (
                 <div className="text-red-500 dark:text-red-400 text-sm mt-1">{errors.reservation_time}</div>
+              )}
+              {/* Show availability status for selected time */}
+              {!loadingAvailability && formData.reservation_time && formData.number_of_guests && (
+                <div className="mt-2 text-sm">
+                  {(() => {
+                    const timeForAPI = formData.reservation_time.substring(0, 5)
+                    const availability = availableSlots.find(avail => avail.time === timeForAPI)
+                    
+                    if (!availability) {
+                      return <span className="text-gray-500">Checking availability for {timeForAPI}...</span>
+                    }
+                    
+                    if (availability.available) {
+                      const tableCount = availability.tables?.length || 0
+                      return (
+                        <span className="text-green-600 dark:text-green-400">
+                          ✓ {tableCount} table{tableCount !== 1 ? 's' : ''} available at {timeForAPI}
+                        </span>
+                      )
+                    } else {
+                      return (
+                        <span className="text-red-600 dark:text-red-400">
+                          ✗ No tables available at {timeForAPI} for {formData.number_of_guests} guests
+                        </span>
+                      )
+                    }
+                  })()}
+                </div>
               )}
             </div>
 
             <div className="mb-4">
               <label htmlFor="table_id" className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                Table * 
+                Table *
                 {loadingAvailability && (
                   <span className="text-xs font-normal text-blue-600 dark:text-blue-400 ml-2">
                     (Checking availability...)
                   </span>
                 )}
-                {!loadingAvailability && availableTables.length > 0 && (
-                  <span className={`text-xs font-normal ${
+                {!loadingAvailability && formData.reservation_date && formData.reservation_time && formData.number_of_guests && (
+                  <span className={`text-xs font-normal ml-2 ${
+                    availableTables.length === 0 ? 'text-red-600 dark:text-red-400' :
                     availableTables.length <= 1 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'
                   }`}>
-                    ({availableTables.length} table{availableTables.length !== 1 ? 's' : ''} available)
+                    ({availableTables.length} table{availableTables.length !== 1 ? 's' : ''} available at {formData.reservation_time.substring(0, 5)})
                   </span>
                 )}
-                {!loadingAvailability && availableTables.length === 0 && formData.reservation_date && formData.reservation_time && formData.number_of_guests && (
+                {!loadingAvailability && availableTables.length === 0 && formData.reservation_time && formData.number_of_guests && (
                   <span className="text-xs font-normal text-red-600 dark:text-red-400 ml-2">
                     (No tables available at selected time)
+                  </span>
+                )}
+                {!loadingAvailability && formData.reservation_date && !formData.reservation_time && (
+                  <span className="text-xs font-normal text-gray-500 ml-2">
+                    (Select a time to see available tables)
                   </span>
                 )}
               </label>
@@ -535,8 +600,9 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
               >
                 <option value="">
                   {loadingAvailability ? 'Checking availability...' : 
-                   availableTables.length === 0 ? 'No tables available at selected time' : 
-                   'Select a table'}
+                   availableTables.length === 0 && formData.reservation_time ? 
+                   `No tables available at ${formData.reservation_time.substring(0, 5)} for ${formData.number_of_guests} guests` : 
+                   `Select a table (${availableTables.length} available)`}
                 </option>
                 {availableTables.map(table => (
                   <option
@@ -544,12 +610,18 @@ const NewReservationModal = ({ isOpen, onClose, onSubmit, tables = [] }) => {
                     value={String(table.id)}
                     onClick={() => setFormData(prev => ({ ...prev, table_id: String(table.id) }))}
                   >
-                    Table {table.table_number} ({table.capacity} seats)
+                    Table {table.table_number} ({table.capacity} seats) - Available
                   </option>
                 ))}
               </select>
               {errors.table_id && (
                 <div className="text-red-500 dark:text-red-400 text-sm mt-1">{errors.table_id}</div>
+              )}
+              {/* Show helpful message when no tables available */}
+              {!loadingAvailability && availableTables.length === 0 && formData.reservation_time && formData.number_of_guests && (
+                <div className="mt-2 text-sm text-orange-600 dark:text-orange-400">
+                  💡 Try selecting a different time or reducing the number of guests
+                </div>
               )}
             </div>
 

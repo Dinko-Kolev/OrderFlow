@@ -199,7 +199,7 @@ class OrderController {
     let stripeCustomer = null;
 
     // If payment method is Stripe, create payment intent first
-    if (paymentMethod === 'stripe') {
+    if (paymentMethod === 'stripe' || paymentMethod === 'card') {
       try {
         console.log('💰 Processing Stripe payment for order...');
         
@@ -251,15 +251,27 @@ class OrderController {
         
       } catch (error) {
         console.error('❌ Stripe payment setup failed:', error);
-        throw new ValidationError(`Payment setup failed: ${error.message}`);
+        
+        // Development mode: Allow orders without Stripe for testing
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔄 Development mode: Bypassing Stripe payment for testing due to connectivity issues');
+          console.log('🔄 Order will be created with payment_status: pending');
+          orderData.payment_status = 'pending';
+        } else {
+          throw new ValidationError(`Payment setup failed: ${error.message}`);
+        }
       }
+    } else {
+      // For non-Stripe payments (cash, etc.), set status as pending
+      orderData.payment_status = 'pending';
+      console.log('💰 Non-Stripe payment method, order will be created with payment_status: pending');
     }
 
     // Create order using service
     const result = await this.orderService.createOrder(orderData, validatedItems)
 
-    // Return order with payment intent if using Stripe
-    if (paymentMethod === 'stripe' && paymentIntent) {
+    // Return order with payment intent if using Stripe and payment intent was created
+    if ((paymentMethod === 'stripe' || paymentMethod === 'card') && paymentIntent) {
       res.status(201).json({
         success: true,
         order: result,
@@ -272,7 +284,12 @@ class OrderController {
         }
       });
     } else {
-      res.status(201).json(result);
+      // For non-Stripe payments or when Stripe fails in development mode
+      res.status(201).json({
+        success: true,
+        order: result,
+        message: 'Order created successfully'
+      });
     }
   })
 

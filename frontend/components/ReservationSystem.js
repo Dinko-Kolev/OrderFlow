@@ -52,7 +52,7 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
         .then(result => {
           console.log(`🔍 Frontend: Availability response:`, result)
           
-          if (result.success) {
+          if (result && result.success && Array.isArray(result.data)) {
             // Store full availability data for better UX
             setAvailableSlots(result.data)
             console.log(`🔍 Frontend: Set available slots:`, result.data)
@@ -63,7 +63,8 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
               setFormData(prev => ({ ...prev, time: '' }))
             }
           } else {
-            console.error('Error fetching availability:', result.error)
+            console.error('Error fetching availability:', result?.error || 'Invalid response format')
+            console.error('Full response:', result)
             setAvailableSlots([])
             // Reset time if availability check fails
             setFormData(prev => ({ ...prev, time: '' }))
@@ -71,6 +72,11 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
         })
         .catch(error => {
           console.error('Error checking availability:', error)
+          console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          })
           setAvailableSlots([])
           // Reset time if availability check fails
           setFormData(prev => ({ ...prev, time: '' }))
@@ -93,7 +99,7 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
 
   // Helper function to check if a time slot is available
   const isTimeSlotAvailable = (time) => {
-    if (!time || availableSlots.length === 0) return false
+    if (!time || !Array.isArray(availableSlots) || availableSlots.length === 0) return false
     const slot = availableSlots.find(avail => avail.time === time)
     return slot?.available || false
   }
@@ -122,6 +128,20 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
+    // Validate required fields
+    if (!formData.date || !formData.time || !formData.name || !formData.email || !formData.phone || !formData.guests) {
+      const missingFields = []
+      if (!formData.date) missingFields.push('Fecha')
+      if (!formData.time) missingFields.push('Hora')
+      if (!formData.name) missingFields.push('Nombre')
+      if (!formData.email) missingFields.push('Email')
+      if (!formData.phone) missingFields.push('Teléfono')
+      if (!formData.guests) missingFields.push('Número de comensales')
+      
+      alert(`Por favor completa los siguientes campos: ${missingFields.join(', ')}`)
+      return
+    }
+    
     if (!isAuthenticated && !captchaToken) {
       alert('Por favor, completa la verificación CAPTCHA antes de continuar.')
       return
@@ -142,17 +162,22 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
         recaptchaToken: !isAuthenticated ? captchaToken : undefined // Include CAPTCHA token for guests
       }
 
-      console.log('Sending reservation data:', reservationData)
+      console.log('🔍 Frontend: User object:', user)
+      console.log('🔍 Frontend: Is authenticated:', isAuthenticated)
+      console.log('🔍 Frontend: Form data:', formData)
+      console.log('🔍 Frontend: Sending reservation data:', reservationData)
       
       // Send to backend API
       const result = await api.reservations.create(reservationData)
       
-      if (result.success) {
-        console.log('✅ Reservation created successfully:', result.data)
+      console.log('🔍 Frontend: Reservation API response:', result)
+      
+      if (result.success && result.data && result.data.message && result.data.reservation) {
+        console.log('✅ Reservation created successfully:', result.data.reservation)
         setStep(3) // Go to confirmation
       } else {
-        console.error('❌ Reservation failed:', result.error)
-        alert(result.error || 'Error al procesar la reserva. Inténtalo de nuevo.')
+        console.error('❌ Reservation failed:', result.error || result.data?.error || 'Unknown error')
+        alert(result.error || result.data?.error || 'Error al procesar la reserva. Inténtalo de nuevo.')
       }
     } catch (error) {
       console.error('Reservation error:', error)
@@ -285,7 +310,10 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
               {/* Show all time slots with availability status */}
               <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                 {timeSlots.map((slot, index) => {
-                  const availability = availableSlots.find(avail => avail.time === slot)
+                  // Safety check: ensure availableSlots is an array
+                  const availability = Array.isArray(availableSlots) 
+                    ? availableSlots.find(avail => avail.time === slot)
+                    : null
                   const isAvailable = availability?.available || false
                   const isSelected = formData.time === slot
                   
@@ -374,14 +402,14 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
               </div>
               
               {/* Helpful message for unavailable slots */}
-              {availableSlots.some(slot => !slot.available) && (
+              {Array.isArray(availableSlots) && availableSlots.some(slot => !slot.available) && (
                 <div className="text-center text-xs text-gray-500 bg-gray-50 rounded-lg p-2">
                   💡 Los horarios en gris no tienen mesas disponibles. Selecciona solo horarios en verde.
                 </div>
               )}
               
               {/* Real-time availability info */}
-              {formData.time && availableSlots.length > 0 && (
+              {formData.time && Array.isArray(availableSlots) && availableSlots.length > 0 && (
                 <div className={`border rounded-lg p-3 ${
                   isTimeSlotAvailable(formData.time) 
                     ? 'bg-blue-50 border-blue-200' 
@@ -426,7 +454,7 @@ export default function ReservationSystem({ isModal = false, onClose = null }) {
             </div>
           )}
           
-          {!loading && availableSlots.length === 0 && formData.date && (
+          {!loading && Array.isArray(availableSlots) && availableSlots.length === 0 && formData.date && (
             <div className="text-center py-6 bg-gray-50 rounded-lg">
               <span className="text-2xl mb-2 block">😔</span>
               <p className="text-gray-600">No hay horarios disponibles para esta fecha.</p>

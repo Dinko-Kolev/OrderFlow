@@ -20,21 +20,14 @@ class Order extends BaseEntity {
     this.customer_phone = data.customer_phone || null
     
     // Delivery information
-    this.delivery_address_id = data.delivery_address_id || null
     this.delivery_address_text = data.delivery_address_text || data.deliveryAddress || null
-    this.delivery_instructions = data.delivery_instructions || null
     
     // Pricing
     this.subtotal = data.subtotal || 0.00
-    this.tax_amount = data.tax_amount || 0.00
-    this.delivery_fee = data.delivery_fee || 0.00
-    this.discount_amount = data.discount_amount || 0.00
     this.total_amount = data.total_amount || 0.00
     
     // Timestamps
-    this.order_date = data.order_date || new Date()
     this.estimated_delivery_time = data.estimated_delivery_time || null
-    this.actual_delivery_time = data.actual_delivery_time || null
     
     // Special instructions
     this.special_instructions = data.special_instructions || null
@@ -83,12 +76,9 @@ class Order extends BaseEntity {
    * Calculate order totals
    */
   calculateTotals() {
-    this.subtotal = Math.max(0, this.subtotal)
-    this.tax_amount = Math.max(0, this.tax_amount)
-    this.delivery_fee = Math.max(0, this.delivery_fee)
-    this.discount_amount = Math.max(0, this.discount_amount)
-    
-    this.total_amount = this.subtotal + this.tax_amount + this.delivery_fee - this.discount_amount
+    // Since database doesn't have subtotal column, we'll use total_amount directly
+    // The subtotal calculation is handled in the service layer
+    this.total_amount = Math.max(0, this.total_amount)
     
     return this.total_amount
   }

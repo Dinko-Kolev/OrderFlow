@@ -245,11 +245,12 @@ export const api = {
 
   // Reservations endpoints  
   reservations: {
-    create: (reservationData) => apiClient.adminPost('/reservations', reservationData),
+    create: (reservationData) => apiClient.post('/api/reservations', reservationData),
     getAvailability: (date, guests) => {
       const params = new URLSearchParams()
       if (guests) params.append('guests', guests)
-      return apiClient.adminGet(`/reservations/availability/${date}?${params.toString()}`, {
+      // Use main backend for availability, not admin backend
+      return apiClient.get(`/api/reservations/availability/${date}?${params.toString()}`, {
         cache: false // Disable cache for real-time availability
       })
     },

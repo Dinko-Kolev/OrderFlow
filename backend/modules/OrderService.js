@@ -38,8 +38,8 @@ class OrderService {
       estimatedDelivery.setMinutes(estimatedDelivery.getMinutes() + (order.order_type === 'delivery' ? 45 : 30))
       order.estimated_delivery_time = estimatedDelivery
 
-      // Calculate subtotal from items (support snake_case and camelCase, include customizations)
-      let subtotal = 0
+      // Calculate total from items (support snake_case and camelCase, include customizations)
+      let totalAmount = 0
       for (const item of items) {
         const quantity = item.quantity || 0
         const baseUnitPrice = (item.unit_price ?? item.unitPrice ?? 0)
@@ -54,8 +54,8 @@ class OrderService {
           }
         }
 
-        subtotal += itemTotal
-        console.log('Item subtotal:', {
+        totalAmount += itemTotal
+        console.log('Item total:', {
           product_id: item.product_id,
           quantity,
           unit_price_used: baseUnitPrice,
@@ -63,20 +63,21 @@ class OrderService {
           itemTotal
         })
       }
-      order.subtotal = subtotal
-      console.log('Subtotal calculated:', subtotal)
-
-      // Set delivery fee based on delivery type
-      order.delivery_fee = order.order_type === 'delivery' ? 2.50 : 0.00
-      console.log('Delivery fee set:', order.delivery_fee)
-
-      // Calculate totals (this will set total_amount)
-      order.calculateTotals()
       
+      // Set delivery fee based on delivery type
+      const deliveryFee = order.order_type === 'delivery' ? 2.50 : 0.00
+      console.log('Delivery fee set:', deliveryFee)
+
+      // Calculate final total amount
+      order.total_amount = totalAmount + deliveryFee
+      order.subtotal = totalAmount  // Set subtotal for database
+      console.log('Total amount calculated:', order.total_amount)
+
       // Debug logging
       console.log('Order totals calculated:', {
         subtotal: order.subtotal,
-        delivery_fee: order.delivery_fee,
+        items_total: totalAmount,
+        delivery_fee: deliveryFee,
         total_amount: order.total_amount
       })
 
@@ -91,14 +92,14 @@ class OrderService {
       const orderResult = await client.query(
         `INSERT INTO orders (
           user_id, order_number, order_type, customer_name, customer_phone, 
-          customer_email, delivery_address_text, delivery_instructions, 
-          subtotal, delivery_fee, total_amount, estimated_delivery_time, special_instructions
+          customer_email, delivery_address_text, subtotal, delivery_fee, total_amount, 
+          estimated_delivery_time, special_instructions, status
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING id, order_number`,
         [
           order.user_id, order.order_number, order.order_type, order.customer_name, order.customer_phone,
-          order.customer_email, order.delivery_address_text, order.delivery_instructions,
-          order.subtotal, order.delivery_fee, order.total_amount, order.estimated_delivery_time, order.special_instructions
+          order.customer_email, order.delivery_address_text, totalAmount, deliveryFee, order.total_amount, 
+          order.estimated_delivery_time, order.special_instructions, 'pending'
         ]
       )
 
