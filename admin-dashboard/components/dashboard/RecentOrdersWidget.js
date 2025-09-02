@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Clock } from 'lucide-react';
+import apiClient from '@/lib/api';
 
 const RecentOrdersWidget = ({ isDarkMode }) => {
   const [orders, setOrders] = useState([]);
@@ -45,12 +46,7 @@ const RecentOrdersWidget = ({ isDarkMode }) => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('http://localhost:3003/api/admin/orders');
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to fetch orders');
-      }
+      const data = await apiClient.orders.getAll();
 
       // Store all orders and show based on current display limit
       setAllOrders(data.data);
@@ -74,7 +70,7 @@ const RecentOrdersWidget = ({ isDarkMode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [displayLimit]);
 
   const handleShowMoreOrders = () => {
     const newLimit = Math.min(displayLimit + 10, allOrders.length);

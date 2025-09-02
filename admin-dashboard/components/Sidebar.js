@@ -45,6 +45,12 @@ export default function Sidebar({ isOpen, onToggle }) {
           href: '/',
           icon: LayoutDashboard,
           badge: null
+        },
+        {
+          name: 'Reports',
+          href: '/reports',
+          icon: BarChart3,
+          badge: null
         }
       ]
     },

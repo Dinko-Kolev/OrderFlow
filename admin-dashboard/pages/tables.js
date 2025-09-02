@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTheme } from '../contexts/ThemeContext';
 import Layout from '../components/Layout';
+import ProtectedRoute from '../components/ProtectedRoute';
+import apiClient from '../lib/api';
 import NewTableModal from '../components/NewTableModal';
 import EditTableModal from '../components/EditTableModal';
 import TableReservationsWidget from '../components/TableReservationsWidget';
@@ -39,25 +41,13 @@ export default function Tables() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('http://localhost:3003/api/admin/tables');
-      const data = await response.json();
+      const data = await apiClient.tables.getAll();
 
-      if (data.success) {
-        setTables(data.data);
-        console.log('🍽️ Tables loaded:', data.data);
-        // Show toast using window.showToast (already set up in ToastContainer)
-        if (window.showToast) {
-          window.showToast(`${data.data.length} tables loaded successfully`, 'success', 2000);
-        }
-      } else {
-        throw new Error(data.error || 'Failed to fetch tables');
-      }
+      setTables(data.data);
+      console.log('🍽️ Tables loaded:', data.data);
     } catch (err) {
       console.error('Tables fetch error:', err);
       setError('Failed to load tables');
-      if (window.showToast) {
-        window.showToast('Failed to load tables', 'error', 4000);
-      }
     } finally {
       setLoading(false);
     }
@@ -267,21 +257,24 @@ export default function Tables() {
 
   if (loading && tables.length === 0) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 dark:border-blue-400 mx-auto"></div>
-            <p className="mt-6 text-xl text-gray-700 dark:text-gray-300 font-medium">Loading tables...</p>
-            <p className="mt-2 text-gray-500 dark:text-gray-400">Preparing your table data</p>
+      <ProtectedRoute>
+        <Layout>
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 dark:border-blue-400 mx-auto"></div>
+              <p className="mt-6 text-xl text-gray-700 dark:text-gray-300 font-medium">Loading tables...</p>
+              <p className="mt-2 text-gray-500 dark:text-gray-400">Preparing your table data</p>
+            </div>
           </div>
-        </div>
-      </Layout>
+        </Layout>
+      </ProtectedRoute>
     );
-  }
+}
 
   return (
-    <Layout>
-      <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
+    <ProtectedRoute>
+      <Layout>
+        <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
         
         {/* Header */}
         <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-lg border-b border-gray-200 dark:border-slate-700 transition-colors duration-300">
@@ -556,5 +549,6 @@ export default function Tables() {
         )}
       </div>
     </Layout>
+    </ProtectedRoute>
   );
 }

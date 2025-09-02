@@ -37,7 +37,7 @@ export function MainNav() {
     {
       href: '/',
       icon: HomeIcon,
-      label: 'Home',
+      label: 'Inicio',
       description: 'Ir al inicio'
     },
     {
@@ -55,7 +55,7 @@ export function MainNav() {
     {
       href: '/contact',
       icon: RestaurantLocationIcon,
-      label: 'Contact',
+      label: 'Contacto',
       description: 'Contacto y ubicación'
     },
     // Cart button (always visible now)
@@ -71,20 +71,20 @@ export function MainNav() {
       {
         href: '/profile',
         icon: ProfileIcon,
-        label: 'Profile',
+        label: 'Perfil',
         description: 'Mi perfil'
       },
       {
         onClick: handleLogout,
         icon: LogoutIcon,
-        label: 'Logout',
+        label: 'Cerrar sesión',
         description: 'Cerrar sesión'
       }
     ] : [
       {
         href: '/login',
         icon: LoginIcon,
-        label: 'Login',
+        label: 'Iniciar sesión',
         description: 'Iniciar sesión'
       }
     ])

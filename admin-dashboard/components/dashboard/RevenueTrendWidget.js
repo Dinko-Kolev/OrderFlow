@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Line } from 'react-chartjs-2';
+import { orders } from '@/lib/api';
+
 
 const RevenueTrendWidget = ({ isDarkMode }) => {
   const [revenueData, setRevenueData] = useState(null);
@@ -78,13 +80,7 @@ const RevenueTrendWidget = ({ isDarkMode }) => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('http://localhost:3003/api/admin/orders');
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to fetch orders');
-      }
-
+      const data = await orders.getAll();
       const chartData = buildRevenueChartData(data.data);
       setRevenueData(chartData);
 

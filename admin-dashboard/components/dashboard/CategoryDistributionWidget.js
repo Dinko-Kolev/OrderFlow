@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tag, Package } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { categories, products } from '@/lib/api';
 
 export const CategoryDistributionWidget = ({ isDarkMode = false }) => {
   const [categoryData, setCategoryData] = useState([]);
@@ -12,22 +13,14 @@ export const CategoryDistributionWidget = ({ isDarkMode = false }) => {
       try {
         setLoading(true);
         
-        // Fetch both categories and products to calculate distribution
-        const [categoriesResponse, productsResponse] = await Promise.all([
-          fetch('http://localhost:3003/api/admin/categories'),
-          fetch('http://localhost:3003/api/admin/products')
+        // Fetch both categories and products to calculate distribution using API client
+        const [categoriesData, productsData] = await Promise.all([
+          categories.getAll(),
+          products.getAll()
         ]);
         
-        if (!categoriesResponse.ok) throw new Error('Failed to fetch categories');
-        if (!productsResponse.ok) throw new Error('Failed to fetch products');
-        
-        const categoriesData = await categoriesResponse.json();
-        const productsData = await productsResponse.json();
-        
-        if (categoriesData.success && productsData.data) {
-          const distribution = buildCategoryDistributionData(categoriesData.data, productsData.data);
-          setCategoryData(distribution);
-        }
+        const distribution = buildCategoryDistributionData(categoriesData.data, productsData.data);
+        setCategoryData(distribution);
         
       } catch (err) {
         console.error('Error fetching category distribution:', err);

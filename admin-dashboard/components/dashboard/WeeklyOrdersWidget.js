@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bar } from 'react-chartjs-2';
 import { Calendar, TrendingUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { Bar } from 'react-chartjs-2';
+import { orders } from '@/lib/api';
 
 export const WeeklyOrdersWidget = ({ isDarkMode = false }) => {
   const [weeklyData, setWeeklyData] = useState([]);
@@ -13,15 +14,10 @@ export const WeeklyOrdersWidget = ({ isDarkMode = false }) => {
       try {
         setLoading(true);
         
-        // Fetch orders from the API
-        const response = await fetch('http://localhost:3003/api/admin/orders');
-        if (!response.ok) throw new Error('Failed to fetch orders');
-        const data = await response.json();
-        
-        if (data.success) {
-          const weeklyStats = buildWeeklyOrdersData(data.data);
-          setWeeklyData(weeklyStats);
-        }
+        // Fetch orders from the API using the API client
+        const data = await orders.getAll();
+        const weeklyStats = buildWeeklyOrdersData(data.data);
+        setWeeklyData(weeklyStats);
         
       } catch (err) {
         console.error('Error fetching weekly orders:', err);

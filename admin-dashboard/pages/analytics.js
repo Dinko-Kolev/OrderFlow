@@ -3,7 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
+import ProtectedRoute from '../components/ProtectedRoute';
+import apiClient from '../lib/api';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -65,20 +68,23 @@ export default function Analytics() {
 
   if (loading && !analyticsData) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 dark:border-blue-400 mx-auto"></div>
-            <p className="mt-6 text-xl text-gray-700 dark:text-gray-300 font-medium">Loading analytics...</p>
-            <p className="mt-2 text-gray-500 dark:text-gray-400">Preparing your business insights</p>
+      <ProtectedRoute>
+        <Layout>
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 dark:border-blue-400 mx-auto"></div>
+              <p className="mt-6 text-xl text-gray-700 dark:text-gray-300 font-medium">Loading analytics...</p>
+              <p className="mt-2 text-gray-500 dark:text-gray-400">Preparing your business insights</p>
+            </div>
           </div>
-        </div>
-      </Layout>
+        </Layout>
+      </ProtectedRoute>
     );
   }
 
   return (
-    <Layout>
+    <ProtectedRoute>
+      <Layout>
       <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
         
         {/* Header */}
@@ -265,5 +271,6 @@ export default function Analytics() {
         </div>
       </div>
     </Layout>
+    </ProtectedRoute>
   );
 }
