@@ -12,6 +12,7 @@ This project is configured with comprehensive security measures to protect all p
 - ❌ `frontend/.env.local` - Frontend service environment variables
 - ❌ `admin-backend/.env` - Admin backend environment variables
 - ❌ `admin-dashboard/.env.local` - Admin dashboard environment variables
+- ❌ `kitchen-display/.env.local` - Kitchen display environment variables
 - ❌ Any `.env*` files with secrets or credentials
 
 ### **Database & Credentials**

@@ -181,6 +181,27 @@ services:
     profiles:
       - seed-data
 
+  # Kitchen Display Service (Planned)
+  # kitchen-display:
+  #   build: 
+  #     context: ./kitchen-display
+  #     dockerfile: Dockerfile
+  #   depends_on:
+  #     backend:
+  #       condition: service_healthy
+  #   environment:
+  #     NODE_ENV: ${NODE_ENV}
+  #     NEXT_PUBLIC_API_URL: http://backend:3001
+  #     NEXT_PUBLIC_WEBSOCKET_URL: ws://backend:3001
+  #   ports:
+  #     - "3004:3000"
+  #   volumes:
+  #     - ./kitchen-display:/app
+  #     - /app/node_modules
+  #   restart: unless-stopped
+  #   networks:
+  #     - default
+
 volumes:
   pgdata:
   pgadmin_data:
