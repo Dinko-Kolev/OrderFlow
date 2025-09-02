@@ -6,6 +6,7 @@ OrderFlow is a comprehensive restaurant management system with multiple componen
 - **Backend**: Main API server for orders and reservations
 - **Admin-Backend**: Administrative API server
 - **Admin-Dashboard**: Administrative web interface
+- **Kitchen-Display**: Kitchen order management interface (planned)
 
 ## 📊 **Testing Coverage Status**
 
@@ -160,11 +161,11 @@ OrderFlow is a comprehensive restaurant management system with multiple componen
 
 | Component | Test Files | Total Tests | Coverage Areas |
 |-----------|------------|-------------|----------------|
-| **Frontend** | 4 | 59 | Authentication, Orders, Reservations, UI |
-| **Backend** | 2 | 43 | Authentication, Orders, API |
-| **Admin-Backend** | 3 | 88 | Orders, Products, Dashboard, Analytics |
-| **Admin-Dashboard** | 4 | 149 | Modals, Widgets, Navigation, UI |
-| **TOTAL** | **13** | **339** | **Full System Coverage** |
+| **Frontend** | 7 | 59 | Authentication, Orders, Reservations, UI |
+| **Backend** | 3 | 43 | Authentication, Orders, API |
+| **Admin-Backend** | 4 | 88 | Orders, Products, Dashboard, Analytics |
+| **Admin-Dashboard** | 5 | 149 | Modals, Widgets, Navigation, UI |
+| **TOTAL** | **19** | **339** | **Full System Coverage** |
 
 ---
 

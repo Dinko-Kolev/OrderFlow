@@ -20,6 +20,9 @@ OrderFlow/
 ├── admin-dashboard/
 │   ├── .env.local                # Admin dashboard variables
 │   └── .env.example              # Admin dashboard template
+├── kitchen-display/              # Kitchen display (planned)
+│   ├── .env.local                # Kitchen display variables
+│   └── .env.example              # Kitchen display template
 ├── .dockerignore                 # Docker build optimization
 └── .gitignore                    # Security - protects .env files
 ```

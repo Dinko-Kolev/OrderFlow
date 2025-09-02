@@ -9,6 +9,7 @@ Complete guide for setting up the OrderFlow Pizza Restaurant system using Docker
 - **Git** (to clone the repository)
 - At least **4GB RAM** available for Docker
 - **10GB** free disk space
+- **Stripe Account** (for payment processing)
 
 ## 🚀 Quick Start (Recommended)
 

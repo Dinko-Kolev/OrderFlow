@@ -10,6 +10,7 @@ OrderFlow/
 ├── backend/            # Main Express.js API server with modular services
 ├── admin-dashboard/    # Admin interface Next.js application
 ├── admin-backend/      # Admin-specific Express.js API server
+├── kitchen-display/    # Kitchen display Next.js application (planned)
 ├── database/           # PostgreSQL database with schema and functions
 ├── docker-compose.yml  # Multi-container orchestration
 ├── setup.sh           # Automated setup script
@@ -494,20 +495,20 @@ This project is licensed under the MIT License.
 - **Docker Infrastructure** - Complete containerization with health checks
 - **Environment Security** - Secure .env management and automated setup
 - **Data Seeding** - Comprehensive sample data for testing
+- **Admin Dashboard** - Complete restaurant management interface
+- **Comprehensive Testing** - 339 tests across all components
+- **Video Background System** - YouTube integration with fallback support
 
 ### 🚧 **In Development**
-- **Order Tracking** - Real-time order status updates
-- **Admin Dashboard** - Restaurant management interface
-- **Advanced Analytics** - Business intelligence and reporting
+- **Performance Optimization** - Database queries and API response improvements
 
 ### 🔮 **Future Roadmap**
-- **Kitchen Display System** - Real-time order streaming
+- **Kitchen Display System** - Real-time order streaming with dedicated interface
 - **Inventory Management** - Stock tracking and alerts
 - **Customer Analytics** - Reservation and order insights
 - **Mobile App** - Native iOS/Android applications
 - **Multi-location Support** - Chain restaurant management
 - **Advanced Reporting** - Business intelligence and analytics
-- **Laravel Filament Admin** - Professional admin dashboard
 
 ## 📚 **Additional Documentation**
 

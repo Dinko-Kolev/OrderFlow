@@ -26,9 +26,24 @@ This document summarizes the comprehensive testing implementation for the OrderF
 
 ### 4. Comprehensive Test Files
 - `frontend/__tests__/reservation-system.test.js` - Frontend reservation system tests
+- `frontend/__tests__/login.test.js` - Frontend authentication tests
+- `frontend/__tests__/register.test.js` - Frontend registration tests
+- `frontend/__tests__/payment-form.test.js` - Frontend payment tests
+- `frontend/__tests__/checkout.test.js` - Frontend checkout tests
+- `frontend/__tests__/order-completion.test.js` - Frontend order completion tests
+- `frontend/__tests__/reservation.test.js` - Frontend reservation tests
 - `admin-dashboard/__tests__/reservation-admin.test.js` - Admin dashboard reservation tests
+- `admin-dashboard/__tests__/Navigation.test.jsx` - Admin navigation tests
+- `admin-dashboard/__tests__/TopBar.test.jsx` - Admin top bar tests
+- `admin-dashboard/__tests__/NewReservationModal.test.jsx` - Admin reservation modal tests
+- `admin-dashboard/__tests__/TableReservationsWidget.test.jsx` - Admin table widget tests
 - `backend/__tests__/reservation-backend.test.js` - Backend reservation API tests
+- `backend/__tests__/auth.test.js` - Backend authentication tests
+- `backend/__tests__/orders.test.js` - Backend orders API tests
 - `admin-backend/__tests__/reservation-admin-backend.test.js` - Admin backend reservation tests
+- `admin-backend/__tests__/orders-admin.test.js` - Admin backend orders tests
+- `admin-backend/__tests__/products-admin.test.js` - Admin backend products tests
+- `admin-backend/__tests__/dashboard-admin.test.js` - Admin backend dashboard tests
 
 ### 5. Test Runner and Documentation
 - `run-reservation-tests.sh` - Comprehensive test runner script
