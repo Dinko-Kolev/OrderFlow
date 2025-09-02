@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTheme } from '../contexts/ThemeContext';
 import Layout from '../components/Layout';
+import ProtectedRoute from '../components/ProtectedRoute';
+import apiClient from '../lib/api';
 import NewReservationModal from '../components/NewReservationModal';
 import EditReservationModal from '../components/EditReservationModal';
 import { 
@@ -67,20 +69,15 @@ export default function Reservations() {
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (dateFilter) params.append('date', dateFilter);
 
-      const response = await fetch(`http://localhost:3003/api/admin/reservations?${params}`);
-      const data = await response.json();
+      const data = await apiClient.reservations.getAll(Object.fromEntries(params));
 
-      if (data.success) {
-        setReservations(data.data);
-        setTotalPages(data.pagination.totalPages);
-        setTotalReservations(data.pagination.total);
-        setCurrentPage(data.pagination.page);
-        console.log('📅 Reservations loaded:', data.data);
-        if (window.showToast) {
-          window.showToast(`${data.data.length} reservations loaded`, 'success', 2000);
-        }
-      } else {
-        throw new Error(data.error || 'Failed to fetch reservations');
+      setReservations(data.data);
+      setTotalPages(data.pagination.totalPages);
+      setTotalReservations(data.pagination.total);
+      setCurrentPage(data.pagination.page);
+      console.log('📅 Reservations loaded:', data.data);
+      if (window.showToast) {
+        window.showToast(`${data.data.length} reservations loaded`, 'success', 2000);
       }
     } catch (err) {
       console.error('Reservations fetch error:', err);
@@ -380,21 +377,24 @@ export default function Reservations() {
 
   if (loading && reservations.length === 0) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 dark:border-blue-400 mx-auto"></div>
-            <p className="mt-6 text-xl text-gray-700 dark:text-gray-300 font-medium">Loading reservations...</p>
-            <p className="mt-2 text-gray-500 dark:text-gray-400">Preparing your reservation data</p>
+      <ProtectedRoute>
+        <Layout>
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 dark:border-blue-400 mx-auto"></div>
+              <p className="mt-6 text-xl text-gray-700 dark:text-gray-300 font-medium">Loading reservations...</p>
+              <p className="mt-2 text-gray-500 dark:text-gray-400">Preparing your reservation data</p>
+            </div>
           </div>
-        </div>
-      </Layout>
+        </Layout>
+      </ProtectedRoute>
     );
-  }
+}
 
   return (
-    <Layout>
-      <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
+    <ProtectedRoute>
+      <Layout>
+        <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
         
         {/* Header */}
         <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-lg border-b border-gray-200 dark:border-slate-700 transition-colors duration-300">
@@ -1042,5 +1042,6 @@ export default function Reservations() {
 
       </div>
     </Layout>
+    </ProtectedRoute>
   );
 }

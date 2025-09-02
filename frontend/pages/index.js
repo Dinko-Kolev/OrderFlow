@@ -28,9 +28,18 @@ export default function HomePage() {
               minWidth: '100vw'
             }}
             onLoadedData={() => console.log('Video loaded successfully')}
-            onError={(e) => console.error('Video error:', e)}
+            onError={(e) => {
+              console.error('Video error:', e);
+              // Fallback to background image if video fails
+              e.target.style.display = 'none';
+              const fallbackDiv = e.target.parentElement;
+              fallbackDiv.style.backgroundImage = 'url("/images/restaurant-hero-bg.jpg")';
+              fallbackDiv.style.backgroundSize = 'cover';
+              fallbackDiv.style.backgroundPosition = 'center';
+            }}
           >
-            <source src="/videos/pizzacomercial2.mp4" type="video/mp4" />
+            <source src="/videos/restaurant-hero.mp4" type="video/mp4" />
+            <source src="/videos/restaurant-hero.webm" type="video/webm" />
             Your browser does not support the video tag.
           </video>
         </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShoppingCart, Users, Euro, Package, ArrowUp, ArrowDown } from 'lucide-react';
+import { dashboard, orders } from '@/lib/api';
 
 const StatsCardsWidget = ({ isDarkMode }) => {
   const [stats, setStats] = useState({
@@ -96,18 +97,11 @@ const StatsCardsWidget = ({ isDarkMode }) => {
       setLoading(true);
       setError(null);
 
-      // Fetch both stats and orders for monthly calculations
-      const [statsResponse, ordersResponse] = await Promise.all([
-        fetch('http://localhost:3003/api/admin/dashboard'),
-        fetch('http://localhost:3003/api/admin/orders')
+      // Fetch both stats and orders for monthly calculations using the API client
+      const [statsData, ordersData] = await Promise.all([
+        dashboard.getStats(),
+        orders.getAll()
       ]);
-
-      const statsData = await statsResponse.json();
-      const ordersData = await ordersResponse.json();
-
-      if (!statsData.success || !ordersData.success) {
-        throw new Error('Failed to fetch dashboard data');
-      }
 
       setStats(statsData.data);
       const monthlyChanges = calculateMonthlyChange(ordersData.data);

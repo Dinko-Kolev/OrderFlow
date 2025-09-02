@@ -5,7 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
+import ProtectedRoute from '../components/ProtectedRoute';
+import apiClient from '../lib/api';
 import { 
   Settings as SettingsIcon, 
   Bell, 
@@ -55,7 +58,8 @@ export default function Settings() {
   };
 
   return (
-    <Layout>
+    <ProtectedRoute>
+      <Layout>
       <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
         
         {/* Header */}
@@ -327,5 +331,6 @@ export default function Settings() {
         </div>
       </div>
     </Layout>
+    </ProtectedRoute>
   );
 }

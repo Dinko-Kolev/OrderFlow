@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
+import ProtectedRoute from '../components/ProtectedRoute';
+import apiClient from '../lib/api';
 import NewReservationModal from '../components/NewReservationModal';
 import { 
   Calendar as CalendarIcon,
@@ -100,9 +103,35 @@ export default function Calendar() {
   // Get reservations for a specific date
   const getReservationsForDate = (date) => {
     const dateString = date.toISOString().split('T')[0];
-    return reservations.filter(reservation => 
-      reservation.reservation_date === dateString
-    );
+    
+    // Try multiple date formats to handle different API responses
+    const matchingReservations = reservations.filter(reservation => {
+      const reservationDate = reservation.reservation_date || reservation.date || reservation.reservationDate;
+      
+      // Handle different date formats
+      if (!reservationDate) return false;
+      
+      // If it's already in YYYY-MM-DD format
+      if (reservationDate === dateString) return true;
+      
+      // If it's a full datetime, extract just the date part
+      if (reservationDate.includes('T')) {
+        return reservationDate.split('T')[0] === dateString;
+      }
+      
+      // If it's a different format, try to parse it
+      try {
+        const parsedDate = new Date(reservationDate);
+        const parsedDateString = parsedDate.toISOString().split('T')[0];
+        return parsedDateString === dateString;
+      } catch (e) {
+        return false;
+      }
+    });
+    
+
+    
+    return matchingReservations;
   };
 
   // Navigation functions
@@ -183,8 +212,7 @@ export default function Calendar() {
   // Fetch restaurant configuration
   const fetchRestaurantConfig = async () => {
     try {
-      const configResponse = await fetch('http://localhost:3003/api/admin/restaurant/config');
-      const configData = await configResponse.json();
+      const configData = await apiClient.restaurant.getConfig();
       if (configData.success) {
         setRestaurantConfig(configData.data);
       }
@@ -196,8 +224,7 @@ export default function Calendar() {
   // Fetch tables for new reservations
   const fetchTables = async () => {
     try {
-      const response = await fetch('http://localhost:3003/api/admin/tables');
-      const data = await response.json();
+      const data = await apiClient.tables.getAll();
       if (data.success) {
         setTables(data.data || []);
       }
@@ -221,12 +248,14 @@ export default function Calendar() {
         limit: '1000' // Get all reservations for the month
       });
 
-      const response = await fetch(`http://localhost:3003/api/admin/reservations?${params}`);
-      const data = await response.json();
+      const data = await apiClient.reservations.getAll({
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+        limit: '1000'
+      });
 
       if (data.success) {
         setReservations(data.data || []);
-        console.log('📅 Calendar reservations loaded:', data.data);
         if (window.showToast) {
           window.showToast(`${data.data.length} reservations loaded for ${monthNames[currentMonth]} ${currentYear}`, 'success', 2000);
         }
@@ -292,15 +321,7 @@ export default function Calendar() {
 
   const handleStatusUpdate = async (reservationId, newStatus) => {
     try {
-      const response = await fetch(`http://localhost:3003/api/admin/reservations/${reservationId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      const data = await response.json();
+      const data = await apiClient.reservations.update(reservationId, { status: newStatus });
 
       if (data.success) {
         if (window.showToast) {
@@ -321,20 +342,23 @@ export default function Calendar() {
 
   if (loading && reservations.length === 0) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 dark:border-blue-400 mx-auto"></div>
-            <p className="mt-6 text-xl text-gray-700 dark:text-gray-300 font-medium">Loading calendar...</p>
-            <p className="mt-2 text-gray-500 dark:text-gray-400">Preparing your reservation calendar</p>
+      <ProtectedRoute>
+        <Layout>
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 dark:border-blue-400 mx-auto"></div>
+              <p className="mt-6 text-xl text-gray-700 dark:text-gray-300 font-medium">Loading calendar...</p>
+              <p className="mt-2 text-gray-500 dark:text-gray-400">Preparing your reservation calendar</p>
+            </div>
           </div>
-        </div>
-      </Layout>
+        </Layout>
+      </ProtectedRoute>
     );
   }
 
   return (
-    <Layout>
+    <ProtectedRoute>
+      <Layout>
       <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
         
         {/* Header */}
@@ -536,6 +560,8 @@ export default function Calendar() {
             </CardContent>
           </Card>
 
+
+
           {/* Selected Date/Reservation Details */}
           {(selectedDate || selectedReservation) && (
             <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl mt-6">
@@ -700,13 +726,7 @@ export default function Calendar() {
         onSubmit={async (reservationData) => {
           try {
             // Make the actual API call to create the reservation
-            const response = await fetch('http://localhost:3003/api/admin/reservations', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(reservationData)
-            });
-
-            const data = await response.json();
+            const data = await apiClient.reservations.create(reservationData);
             
             if (data.success) {
               if (window.showToast) {
@@ -727,5 +747,6 @@ export default function Calendar() {
         tables={tables}
       />
     </Layout>
+    </ProtectedRoute>
   );
 }

@@ -13,6 +13,7 @@ import {
   ArrowRight,
   AlertCircle
 } from 'lucide-react';
+import apiClient from '@/lib/api';
 
 const UpcomingReservationsWidget = ({ isDarkMode }) => {
   const [reservations, setReservations] = useState([]);
@@ -24,15 +25,9 @@ const UpcomingReservationsWidget = ({ isDarkMode }) => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('http://localhost:3003/api/admin/reservations/today');
-      const data = await response.json();
-
-      if (data.success) {
-        setReservations(data.data);
-        console.log('📅 Today\'s Reservations:', data.data);
-      } else {
-        throw new Error(data.error || 'Failed to fetch today\'s reservations');
-      }
+      const data = await apiClient.reservations.getToday();
+      setReservations(data.data);
+      console.log('📅 Today\'s Reservations:', data.data);
     } catch (err) {
       console.error('Today\'s reservations fetch error:', err);
       setError('Failed to load today\'s reservations');

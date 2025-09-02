@@ -1,16 +1,20 @@
 const express = require("express");
 const router = express.Router();
 
+// Import authentication middleware
+const { authenticateAdmin } = require("../middleware/auth");
+
 // Import feature-based route modules
-router.use("/products", require("./products"));
-router.use("/orders", require("./orders"));
-router.use("/customers", require("./customers"));
-router.use("/categories", require("./categories"));
-router.use("/dashboard", require("./dashboard"));
-router.use("/tables", require("./tables"));
-router.use("/reservations", require("./reservations"));
-router.use("/inventory", require("./inventory"));
-router.use("/restaurant", require("./restaurant"));
+router.use("/auth", require("./auth")); // Authentication routes (no auth required)
+router.use("/products", authenticateAdmin, require("./products"));
+router.use("/orders", authenticateAdmin, require("./orders"));
+router.use("/customers", authenticateAdmin, require("./customers"));
+router.use("/categories", authenticateAdmin, require("./categories"));
+router.use("/dashboard", authenticateAdmin, require("./dashboard"));
+router.use("/tables", authenticateAdmin, require("./tables"));
+router.use("/reservations", authenticateAdmin, require("./reservations"));
+router.use("/inventory", authenticateAdmin, require("./inventory"));
+router.use("/restaurant", authenticateAdmin, require("./restaurant"));
 
 // Legacy endpoints for backward compatibility
 router.get("/products", async (req, res) => {

@@ -453,8 +453,8 @@ export default function ProfilePage() {
             <div className="bg-white rounded-2xl shadow-xl p-6 border-l-4 border-red-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Account Deletion</h3>
-                  <p className="text-sm text-gray-600 mt-1">Permanently remove your account</p>
+                  <h3 className="text-lg font-semibold text-gray-900">Eliminación de cuenta</h3>
+                  <p className="text-sm text-gray-600 mt-1">Esto eliminará tu cuenta permanentemente</p>
                 </div>
                 <button
                   onClick={() => setShowDeleteAccountModal(true)}
@@ -467,10 +467,10 @@ export default function ProfilePage() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Processing...
+                      Procesando...
                     </>
                   ) : (
-                    'Delete Account'
+                    'Eliminar cuenta'
                   )}
                 </button>
               </div>

@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
+import ProtectedRoute from '../components/ProtectedRoute';
+import apiClient from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -25,22 +29,19 @@ export default function RestaurantSettings() {
     try {
       setLoading(true);
       // Fetch working hours
-      const hoursResponse = await fetch('http://localhost:3003/api/admin/restaurant/working-hours');
-      const hoursData = await hoursResponse.json();
+      const hoursData = await apiClient.restaurant.getWorkingHours();
       if (hoursData.success) {
         setWorkingHours(hoursData.data);
       }
 
       // Fetch reservation configuration
-      const configResponse = await fetch('http://localhost:3003/api/admin/restaurant/config');
-      const configData = await configResponse.json();
+      const configData = await apiClient.restaurant.getConfig();
       if (configData.success) {
         setReservationConfig(configData.data);
       }
 
       // Fetch policies
-      const policiesResponse = await fetch('http://localhost:3003/api/admin/restaurant/policies');
-      const policiesData = await policiesResponse.json();
+      const policiesData = await apiClient.restaurant.getPolicies();
       if (policiesData.success) {
         setPolicies(policiesData.data);
       }
@@ -56,13 +57,9 @@ export default function RestaurantSettings() {
 
   const updateWorkingHours = async (dayOfWeek, updates) => {
     try {
-      const response = await fetch(`http://localhost:3003/api/admin/restaurant/working-hours/${dayOfWeek}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
+      const data = await apiClient.restaurant.updateWorkingHours(dayOfWeek, updates);
       
-      if (response.ok) {
+      if (data.success) {
         if (window.showToast) {
           window.showToast('Working hours updated successfully', 'success', 2000);
         }
@@ -78,13 +75,9 @@ export default function RestaurantSettings() {
 
   const updateReservationConfig = async (key, value) => {
     try {
-      const response = await fetch('http://localhost:3003/api/admin/restaurant/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config_key: key, config_value: value })
-      });
+      const data = await apiClient.restaurant.updateConfig({ config_key: key, config_value: value });
       
-      if (response.ok) {
+      if (data.success) {
         if (window.showToast) {
           window.showToast('Configuration updated successfully', 'success', 2000);
         }
@@ -100,13 +93,12 @@ export default function RestaurantSettings() {
 
   const updatePolicy = async (policyName, value, isActive) => {
     try {
-      const response = await fetch(`http://localhost:3003/api/admin/restaurant/policies/${policyName}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ policy_value: value, is_active: isActive })
+      const data = await apiClient.restaurant.updatePolicy(policyName, { 
+        policy_value: value, 
+        is_active: isActive 
       });
       
-      if (response.ok) {
+      if (data.success) {
         if (window.showToast) {
           window.showToast('Policy updated successfully', 'success', 2000);
         }
@@ -178,19 +170,22 @@ export default function RestaurantSettings() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-            <p className="text-gray-600">Loading restaurant settings...</p>
+      <ProtectedRoute>
+        <Layout>
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <p className="text-gray-600">Loading restaurant settings...</p>
+            </div>
           </div>
-        </div>
-      </Layout>
+        </Layout>
+      </ProtectedRoute>
     );
   }
 
   return (
-    <Layout>
+    <ProtectedRoute>
+      <Layout>
       <div className="p-6">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
@@ -628,5 +623,6 @@ export default function RestaurantSettings() {
         </div>
       </div>
     </Layout>
+    </ProtectedRoute>
   );
 }

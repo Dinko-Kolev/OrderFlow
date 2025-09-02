@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTheme } from '../contexts/ThemeContext';
 import Layout from '../components/Layout';
+import ProtectedRoute from '../components/ProtectedRoute';
+import apiClient from '../lib/api';
 import { 
   Plus,
   Search,
@@ -46,32 +48,16 @@ export default function Categories() {
 
   useEffect(() => {
     fetchCategories();
-    // Show welcome toast after a short delay
-    const timer = setTimeout(() => {
-      window.showToast('Categories management system ready! 🏷️', 'success', 3000);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
   }, []);
 
   const fetchCategories = async () => {
     try {
-      window.showToast('Loading categories...', 'info', 1500);
-      const response = await fetch('http://localhost:3003/api/admin/categories');
-      const data = await response.json();
+      const data = await apiClient.categories.getAll();
       
-      if (data.success) {
-        setCategories(data.data || []);
-        if (data.data && data.data.length > 0) {
-          window.showToast(`${data.data.length} categories loaded successfully`, 'success', 2000);
-        } else {
-          window.showToast('No categories found', 'warning', 2000);
-        }
-      }
+      setCategories(data.data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
       setCategories([]);
-      window.showToast('Failed to load categories. Please refresh the page.', 'error', 4000);
     } finally {
       setLoading(false);
     }
@@ -238,40 +224,16 @@ export default function Categories() {
 
       if (showEditModal && selectedCategory) {
         // Update existing category
-        const response = await fetch(`http://localhost:3003/api/admin/categories/${selectedCategory.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(categoryData)
-        });
-
-        if (response.ok) {
-          window.showToast('Category updated successfully!', 'success');
-          fetchCategories(); // Refresh the list
-          handleCloseModal();
-        } else {
-          const errorData = await response.json();
-          window.showToast(errorData.error || 'Failed to update category. Please try again.', 'error');
-        }
+        await apiClient.categories.update(selectedCategory.id, categoryData);
+        window.showToast('Category updated successfully!', 'success');
+        fetchCategories(); // Refresh the list
+        handleCloseModal();
       } else {
         // Create new category
-        const response = await fetch('http://localhost:3003/api/admin/categories', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(categoryData)
-        });
-
-        if (response.ok) {
-          window.showToast('Category created successfully!', 'success');
-          fetchCategories(); // Refresh the list
-          handleCloseModal();
-        } else {
-          const errorData = await response.json();
-          window.showToast(errorData.error || 'Failed to create category. Please try again.', 'error');
-        }
+        await apiClient.categories.create(categoryData);
+        window.showToast('Category created successfully!', 'success');
+        fetchCategories(); // Refresh the list
+        handleCloseModal();
       }
     } catch (error) {
       console.error('Error saving category:', error);
@@ -286,18 +248,10 @@ export default function Categories() {
     window.showToast('Deleting category...', 'warning', 2000);
 
     try {
-      const response = await fetch(`http://localhost:3003/api/admin/categories/${selectedCategory.id}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        window.showToast('Category deleted successfully!', 'success');
-        fetchCategories(); // Refresh the list
-        handleCloseModal();
-      } else {
-        const errorData = await response.json();
-        window.showToast(errorData.error || 'Failed to delete category. Please try again.', 'error');
-      }
+      await apiClient.categories.delete(selectedCategory.id);
+      window.showToast('Category deleted successfully!', 'success');
+      fetchCategories(); // Refresh the list
+      handleCloseModal();
     } catch (error) {
       console.error('Error deleting category:', error);
       window.showToast('An error occurred. Please try again.', 'error');
@@ -324,8 +278,9 @@ export default function Categories() {
   }
 
   return (
-    <Layout>
-      <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
+    <ProtectedRoute>
+      <Layout>
+        <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
         
         {/* Header */}
       <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-lg border-b border-gray-200 dark:border-slate-700 transition-colors duration-300">
@@ -863,5 +818,6 @@ export default function Categories() {
               )}
       </div>
     </Layout>
+    </ProtectedRoute>
   );
 }

@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
+import ProtectedRoute from '../components/ProtectedRoute';
+import apiClient from '../lib/api';
 import { 
   Plus,
   Search,
@@ -24,6 +27,7 @@ import {
 
 export default function Products() {
   const { isDarkMode } = useTheme();
+  const { isAuthenticated, loading: authLoading, isInitialized } = useAuth();
   const [products, setProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -46,62 +50,68 @@ export default function Products() {
     is_available: true
   });
   const [displayLimit, setDisplayLimit] = useState(100);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-    // Show welcome toast after a short delay
-    const timer = setTimeout(() => {
-      window.showToast('Products management system ready! 🍕', 'success', 3000);
-    }, 1000);
+    console.log('🔄 Products page useEffect triggered');
+    console.log('🔍 Current authentication state:', {
+      hasWindow: typeof window !== 'undefined',
+      token: typeof window !== 'undefined' ? localStorage.getItem('admin_token') : 'no window',
+      user: typeof window !== 'undefined' ? localStorage.getItem('admin_user') : 'no window',
+      isAuthenticated: isAuthenticated(),
+      authLoading,
+      isInitialized
+    });
     
-    return () => clearTimeout(timer);
-  }, [displayLimit]);
+    // Only fetch data when authentication is ready and user is authenticated
+    if (isInitialized && !authLoading && isAuthenticated()) {
+      console.log('✅ Authentication ready, fetching products...');
+      fetchProducts();
+      fetchCategories();
+    } else {
+      console.log('⏳ Waiting for authentication...', {
+        isInitialized,
+        authLoading,
+        isAuthenticated: isAuthenticated()
+      });
+    }
+  }, [displayLimit, isInitialized, authLoading, isAuthenticated]);
 
   const fetchProducts = async () => {
+    console.log('🛍️ fetchProducts() called');
+    setError(null); // Clear previous errors
     try {
-      window.showToast('Refreshing products...', 'info', 1500);
-      const response = await fetch('http://localhost:3003/api/admin/products');
-      const data = await response.json();
+      console.log('🛍️ Calling products.getAll()...');
+      const data = await apiClient.products.getAll();
+      console.log('🛍️ Products API response:', data);
       
-      if (data.success) {
-        setAllProducts(data.data || []);
-        // Show first 100 products initially
-        const productsToShow = (data.data || []).slice(0, displayLimit);
-        setProducts(productsToShow);
-        if (data.data && data.data.length > 0) {
-          window.showToast(`${data.data.length} products loaded (showing ${productsToShow.length})`, 'success', 2000);
-        } else {
-          window.showToast('No products found', 'warning', 2000);
-        }
-      }
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        setProducts([]);
-        window.showToast('Failed to load products. Please refresh the page.', 'error', 4000);
-      } finally {
-        setLoading(false);
-      }
-    };
+      setAllProducts(data.data || []);
+      // Show first 100 products initially
+      const productsToShow = (data.data || []).slice(0, displayLimit);
+      setProducts(productsToShow);
+      console.log('🛍️ Products set successfully:', productsToShow.length, 'products');
+    } catch (error) {
+      console.error('❌ Error fetching products:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      setError(error.message || 'Failed to fetch products');
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchCategories = async () => {
     try {
-      window.showToast('Loading categories...', 'info', 1500);
-      const response = await fetch('http://localhost:3003/api/admin/categories');
-      const data = await response.json();
+      const data = await apiClient.categories.getAll();
       
-      if (data.success) {
-        setCategories(data.data || []);
-        if (data.data && data.data.length > 0) {
-          window.showToast(`${data.data.length} categories loaded`, 'info', 2000);
-        } else {
-          window.showToast('No categories found', 'warning', 2000);
-        }
-      }
+      setCategories(data.data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
       setCategories([]);
-      window.showToast('Failed to load categories. Please refresh the page.', 'error', 4000);
     }
   };
 
@@ -126,7 +136,7 @@ export default function Products() {
 
   const handleAddProduct = () => {
     setShowAddModal(true);
-    window.showToast('Add Product form opened', 'info', 2000);
+
   };
 
   const handleEditProduct = (product) => {
@@ -140,19 +150,17 @@ export default function Products() {
       is_available: product.is_available || true
     });
     setShowEditModal(true);
-    window.showToast(`Editing: ${product.name}`, 'info', 2000);
+
   };
 
   const handleViewProduct = (product) => {
     setSelectedProduct(product);
     setShowViewModal(true);
-    window.showToast(`Viewing details for: ${product.name}`, 'info', 2000);
   };
 
   const handleDeleteProduct = (product) => {
     setSelectedProduct(product);
     setShowDeleteModal(true);
-    window.showToast(`Confirming deletion of: ${product.name}`, 'warning', 3000);
   };
 
   const handleShowMoreProducts = () => {
@@ -160,14 +168,12 @@ export default function Products() {
     setDisplayLimit(newLimit);
     const productsToShow = allProducts.slice(0, newLimit);
     setProducts(productsToShow);
-    window.showToast(`Now showing ${productsToShow.length} products`, 'info', 2000);
   };
 
   const handleShowLessProducts = () => {
     setDisplayLimit(100);
     const productsToShow = allProducts.slice(0, 100);
     setProducts(productsToShow);
-    window.showToast(`Now showing ${productsToShow.length} products`, 'info', 2000);
   };
 
   const handleCloseModal = () => {
@@ -184,7 +190,6 @@ export default function Products() {
       image_url: '',
       is_available: true
     });
-    window.showToast('Modal closed', 'info', 1000);
   };
 
   const handleInputChange = (e) => {
@@ -207,14 +212,12 @@ export default function Products() {
     
     // Show toast notification
     const direction = sortField === field && sortDirection === 'asc' ? 'descending' : 'ascending';
-    window.showToast(`Sorting by ${field} (${direction})`, 'info', 1500);
   };
 
   const handleSubmitProduct = async (e) => {
     e.preventDefault();
     
-    // Show processing toast
-    window.showToast('Processing your request...', 'info', 2000);
+
     
     try {
       const productData = {
@@ -224,66 +227,29 @@ export default function Products() {
 
       if (showEditModal && selectedProduct) {
         // Update existing product
-        const response = await fetch(`http://localhost:3003/api/admin/products/${selectedProduct.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(productData)
-        });
-
-        if (response.ok) {
-          window.showToast('Product updated successfully!', 'success');
-          fetchProducts(); // Refresh the list
-          handleCloseModal();
-        } else {
-          window.showToast('Failed to update product. Please try again.', 'error');
-        }
+        await apiClient.products.update(selectedProduct.id, productData);
+        fetchProducts(); // Refresh the list
+        handleCloseModal();
       } else {
         // Create new product
-        const response = await fetch('http://localhost:3003/api/admin/products', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(productData)
-        });
-
-        if (response.ok) {
-          window.showToast('Product created successfully!', 'success');
-          fetchProducts(); // Refresh the list
-          handleCloseModal();
-        } else {
-          window.showToast('Failed to create product. Please try again.', 'error');
-        }
+        await apiClient.products.create(productData);
+        fetchProducts(); // Refresh the list
+        handleCloseModal();
       }
     } catch (error) {
       console.error('Error saving product:', error);
-      window.showToast('An error occurred. Please try again.', 'error');
     }
   };
 
   const handleConfirmDelete = async () => {
     if (!selectedProduct) return;
 
-    // Show processing toast
-    window.showToast('Deleting product...', 'warning', 2000);
-
     try {
-      const response = await fetch(`http://localhost:3003/api/admin/products/${selectedProduct.id}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        window.showToast('Product deleted successfully!', 'success');
-        fetchProducts(); // Refresh the list
-        handleCloseModal();
-      } else {
-        window.showToast('Failed to delete product. Please try again.', 'error');
-        }
+      await apiClient.products.delete(selectedProduct.id);
+      fetchProducts(); // Refresh the list
+      handleCloseModal();
     } catch (error) {
       console.error('Error deleting product:', error);
-      window.showToast('An error occurred. Please try again.', 'error');
     }
   };
 
@@ -346,26 +312,18 @@ export default function Products() {
     useEffect(() => {
       if (searchTerm || selectedCategory !== 'all') {
         const resultCount = sortedProducts.length;
-        if (resultCount === 0) {
-          window.showToast('No products match your search criteria', 'warning', 2000);
-        } else if (resultCount < products.length) {
-          window.showToast(`Found ${resultCount} matching products`, 'success', 2000);
-        }
+
       }
     }, [sortedProducts.length, searchTerm, selectedCategory, products.length]);
 
     // Show toast when sorting changes
     useEffect(() => {
-      if (sortField !== 'name' || sortDirection !== 'asc') {
-        window.showToast(`Products sorted by ${sortField} (${sortDirection === 'asc' ? 'ascending' : 'descending'})`, 'info', 2000);
-      }
+
     }, [sortField, sortDirection]);
 
     // Show initial sorting info
     useEffect(() => {
-      if (products.length > 0) {
-        window.showToast(`Products sorted by ${sortField} (${sortDirection === 'asc' ? 'ascending' : 'descending'})`, 'info', 2000);
-      }
+
     }, [products.length]);
 
   // Calculate statistics
@@ -379,21 +337,62 @@ export default function Products() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 dark:border-blue-400 mx-auto"></div>
-            <p className="mt-6 text-xl text-gray-700 dark:text-gray-300 font-medium">Loading products...</p>
-            <p className="mt-2 text-gray-500 dark:text-gray-400">Preparing your product catalog</p>
+      <ProtectedRoute>
+        <Layout>
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 dark:border-blue-400 mx-auto"></div>
+              <p className="mt-6 text-xl text-gray-700 dark:text-gray-300 font-medium">Loading products...</p>
+              <p className="mt-2 text-gray-500 dark:text-gray-400">Preparing your product catalog</p>
+            </div>
           </div>
-        </div>
-      </Layout>
+        </Layout>
+      </ProtectedRoute>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <ProtectedRoute>
+        <Layout>
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center max-w-md mx-auto p-6">
+              <div className="bg-red-100 dark:bg-red-900/20 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                Failed to Load Products
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                {error}
+              </p>
+              <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
+                <p>• Check your internet connection</p>
+                <p>• Verify you're logged in properly</p>
+                <p>• Try refreshing the page</p>
+              </div>
+              <Button 
+                onClick={() => {
+                  setError(null);
+                  setLoading(true);
+                  fetchProducts();
+                }}
+                className="mt-4"
+              >
+                Try Again
+              </Button>
+            </div>
+          </div>
+        </Layout>
+      </ProtectedRoute>
     );
   }
 
   return (
-    <Layout>
-      <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
+    <ProtectedRoute>
+      <Layout>
+        <div className="bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-300">
         
         {/* Header */}
       <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-lg border-b border-gray-200 dark:border-slate-700 transition-colors duration-300">
@@ -498,9 +497,7 @@ export default function Products() {
                     onChange={(e) => {
                       const value = e.target.value;
                       setSearchTerm(value);
-                      if (value.length > 0) {
-                        window.showToast(`Searching for: "${value}"`, 'info', 1500);
-                      }
+
                     }}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   />
@@ -514,11 +511,7 @@ export default function Products() {
                   onChange={(e) => {
                     const value = e.target.value;
                     setSelectedCategory(value);
-                    if (value !== 'all') {
-                      window.showToast(`Filtering by category: ${value}`, 'info', 1500);
-                    } else {
-                      window.showToast('Showing all categories', 'info', 1500);
-                    }
+
                   }}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 >
@@ -547,7 +540,6 @@ export default function Products() {
                       onClick={() => {
                         setSortField('name');
                         setSortDirection('asc');
-                        window.showToast('Sorting reset to default', 'info', 1500);
                       }}
                       className="ml-2 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
                     >
@@ -1080,5 +1072,6 @@ export default function Products() {
               )}
       </div>
     </Layout>
+    </ProtectedRoute>
   );
 }
