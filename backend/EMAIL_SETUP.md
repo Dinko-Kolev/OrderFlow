@@ -28,7 +28,7 @@ Create a `.env` file in the backend directory:
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+SMTP_PASS=your-secure-app-password
 ```
 
 ### 3. Restart the Server
@@ -52,7 +52,7 @@ npm start
 ### Step 3: Update Environment Variables
 ```bash
 SMTP_USER=your-email@gmail.com
-SMTP_PASS=abcd efgh ijkl mnop  # Your 16-character app password
+SMTP_PASS=your-secure-app-password  # Your 16-character app password
 ```
 
 ## 📧 Email Templates
@@ -99,7 +99,7 @@ Text Content: [Plain text version]
 SMTP_HOST=smtp-mail.outlook.com
 SMTP_PORT=587
 SMTP_USER=your-email@outlook.com
-SMTP_PASS=your-password
+SMTP_PASS=your-secure-password
 ```
 
 ### Yahoo
@@ -107,7 +107,7 @@ SMTP_PASS=your-password
 SMTP_HOST=smtp.mail.yahoo.com
 SMTP_PORT=587
 SMTP_USER=your-email@yahoo.com
-SMTP_PASS=your-app-password
+SMTP_PASS=your-secure-app-password
 ```
 
 ### Custom SMTP Server
@@ -115,7 +115,7 @@ SMTP_PASS=your-app-password
 SMTP_HOST=your-smtp-server.com
 SMTP_PORT=587
 SMTP_USER=your-username
-SMTP_PASS=your-password
+SMTP_PASS=your-secure-password
 ```
 
 ## 🛡️ Security Best Practices

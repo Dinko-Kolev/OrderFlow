@@ -58,7 +58,7 @@ This project is configured with comprehensive security measures to protect all p
 ```bash
 # ✅ DO: Use .env files for secrets
 SMTP_HOST=mail.yourdomain.com
-SMTP_PASS=your_password_here
+SMTP_PASS=your_secure_password_here
 
 # ❌ DON'T: Commit .env files
 git add .env  # This will be ignored

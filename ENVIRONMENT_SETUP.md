@@ -96,7 +96,7 @@ SMTP_HOST=your_smtp_host     # SMTP server hostname
 SMTP_PORT=587                # SMTP port (587 for TLS, 465 for SSL)
 SMTP_SECURE=false           # true for SSL, false for TLS
 SMTP_USER=your_email         # Email username
-SMTP_PASS=your_password      # Email password
+SMTP_PASS=your_secure_password  # Email password
 ```
 
 ### Stripe Configuration

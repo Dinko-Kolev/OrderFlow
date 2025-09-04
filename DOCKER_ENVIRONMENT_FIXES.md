@@ -95,7 +95,7 @@ OrderFlow/
 | `${DB_PASS}` | `DB_PASS=your_password` | Database password |
 | `${SMTP_HOST}` | `SMTP_HOST=your_smtp` | Email server |
 | `${SMTP_USER}` | `SMTP_USER=your_email` | Email username |
-| `${SMTP_PASS}` | `SMTP_PASS=your_password` | Email password |
+| `${SMTP_PASS}` | `SMTP_PASS=your_secure_password` | Email password |
 | `${STRIPE_SECRET_KEY}` | `STRIPE_SECRET_KEY=sk_test_...` | Stripe backend key |
 | `${STRIPE_PUBLISHABLE_KEY}` | `STRIPE_PUBLISHABLE_KEY=pk_test_...` | Stripe frontend key |
 | `${JWT_SECRET}` | `JWT_SECRET=random_string` | JWT signing secret |
