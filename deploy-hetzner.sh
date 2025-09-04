@@ -76,7 +76,7 @@ install_docker_compose() {
     print_status "Docker Compose installed successfully"
 }
 
-# Install Git
+# Install Git 
 install_git() {
     print_info "Installing Git..."
     
@@ -192,7 +192,7 @@ main() {
 # Handle script interruption
 trap 'print_error "Deployment interrupted"; exit 1' INT TERM
 
-# Run main function
+# Run main function  
 main
 
 exit 0
