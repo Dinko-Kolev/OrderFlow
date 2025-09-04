@@ -199,7 +199,7 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+SMTP_PASS=your-secure-app-password
 
 # Google reCAPTCHA v3
 RECAPTCHA_SECRET_KEY=6L...
