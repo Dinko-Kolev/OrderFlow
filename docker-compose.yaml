@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
       target: production
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       NEXT_TELEMETRY_DISABLED: 1
       NEXT_PUBLIC_API_URL: https://backend-xyz.dinko-kolev.dev
       NEXT_PUBLIC_ADMIN_API_URL: https://admin-backend-xyz.dinko-kolev.dev
