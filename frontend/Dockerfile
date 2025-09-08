@@ -12,7 +12,7 @@ WORKDIR /app
 # Install dependencies based on the preferred package manager
 COPY package*.json ./
 RUN npm install --only=production && npm cache clean --force
-
+ENV NEXT_PUBLIC_API_URL=https://backend-xyz.dinko-kolev.dev
 # Development stage
 FROM base AS development
 RUN npm install && npm cache clean --force
