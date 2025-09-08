@@ -30,3 +30,5 @@ services:
 networks:
   coolify:
     external: true
+
+volumes: {}
