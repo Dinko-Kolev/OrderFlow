@@ -56,6 +56,8 @@ app.get("/health", (req, res) => {
 
 // Admin API routes
 app.use("/api/admin", require("./routes/admin"));
+// Admin Auth routes
+app.use("/api/admin/auth", require("./routes/auth"));
 
 // Error handling
 app.use((err, req, res, next) => {
