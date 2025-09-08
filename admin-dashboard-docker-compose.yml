@@ -3,8 +3,8 @@ version: '3.8'
 services:
   admin-dashboard:
     build: 
-      context: ./admin-dashboard
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./admin-dashboard/Dockerfile
       target: production
     environment:
       NODE_ENV: production

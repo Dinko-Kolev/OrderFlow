@@ -3,8 +3,8 @@ version: '3.8'
 services:
   admin-backend:
     build: 
-      context: ./admin-backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./admin-backend/Dockerfile
     environment:
       NODE_ENV: production
       DB_HOST: coolify-db
