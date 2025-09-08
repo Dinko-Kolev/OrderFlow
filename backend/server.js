@@ -39,7 +39,11 @@ const stripeService = new StripeService();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: [
+    'http://localhost:3000',
+    'https://bellavista.dinko-kolev.dev',
+    'https://w4okskoksc84ckcw0s88k4oo.dinko-kolev.dev'
+  ],
   credentials: true,
 }));
 
