@@ -32,8 +32,9 @@ CMD ["npm", "run", "dev"]
 # Build stage
 FROM base AS builder
 COPY . .
-RUN npm install && npm run build && npm cache clean --force
 ENV NEXT_PUBLIC_API_URL=https://backend-xyz.dinko-kolev.dev
+RUN npm install && npm run build && npm cache clean --force
+
 # Production stage
 FROM base AS production
 COPY --from=builder /app/.next/standalone ./
@@ -43,6 +44,7 @@ COPY --from=builder /app/public ./public
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+ENV NEXT_PUBLIC_API_URL=https://backend-xyz.dinko-kolev.dev
 
 EXPOSE 3000
 
@@ -50,6 +52,3 @@ EXPOSE 3000
 RUN echo '#!/bin/bash\nwhile ! curl -f http://localhost:3000 2>/dev/null; do sleep 1; done' > /wait-for-health.sh && chmod +x /wait-for-health.sh
 
 CMD ["node", "server.js"]
-
-# Default to development for docker-compose
-FROM development

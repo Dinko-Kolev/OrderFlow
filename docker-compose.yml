@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: 1
+      NEXT_PUBLIC_API_URL: https://backend-xyz.dinko-kolev.dev
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    networks:
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`bellavista.dinko-kolev.dev`)"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+
+networks:
+  coolify:
+    external: true
