@@ -45,6 +45,9 @@ app.use(cors({
     'https://w4okskoksc84ckcw0s88k4oo.dinko-kolev.dev'
   ],
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200
 }));
 
 // Stripe Webhook Endpoint - MUST be before express.json() middleware
