@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  admin-backend:
+    build: 
+      context: ./admin-backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      DB_HOST: coolify-db
+      DB_PORT: 5432
+      DB_NAME: orderflow
+      DB_USER: pizza_user
+      DB_PASS: ${DB_PASS}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_FRONTEND_URL: https://admin-dashboard-xyz.dinko-kolev.dev
+      PORT: 3003
+    ports:
+      - "3003:3003"
+    restart: unless-stopped
+    networks:
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin-backend.rule=Host(`admin-backend-xyz.dinko-kolev.dev`)"
+      - "traefik.http.routers.admin-backend.tls=true"
+      - "traefik.http.routers.admin-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.admin-backend.loadbalancer.server.port=3003"
+
+networks:
+  coolify:
+    external: true
