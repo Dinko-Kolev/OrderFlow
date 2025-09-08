@@ -3,9 +3,9 @@ version: '3.8'
 services:
   frontend:
     build: 
-      context: .
-      dockerfile: frontend/Dockerfile
-      target: production  # Use the production stage
+      context: ./frontend  # Build from frontend directory
+      dockerfile: Dockerfile
+      target: production
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: 1
