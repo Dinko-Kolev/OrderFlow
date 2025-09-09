@@ -1,15 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
-
-// Database connection
-const pool = new Pool({
-  host: 'db',
-  port: 5432,
-  database: 'pizza_db',
-  user: 'pizza_user',
-  password: 'pizza_pass'
-});
+const { pool } = require('../db');
 
 // GET /api/admin/tables - Get all tables with current status
 router.get('/', async (req, res) => {
